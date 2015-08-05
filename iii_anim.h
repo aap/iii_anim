@@ -112,9 +112,29 @@ struct AnimBlendFrameData;
 class CAnimBlendClumpData;
 class CAnimManager;
 
+void FrameUpdateCallBack(AnimBlendFrameData *frame, void *arg);
+
 extern int &ClumpOffset;
+extern CAnimBlendClumpData *&gpAnimBlendClump;
+void AnimBlendClumpDestroy(RpClump *clump);
+void RpAnimBlendClumpUpdateAnimations(RpClump *clump, float timeDelta, bool doRender);
+CAnimBlendAssociation *RpAnimBlendClumpGetFirstAssociation(RpClump *clump);
+void RpAnimBlendAllocateData(RpClump *clump);
 AnimBlendFrameData *RpAnimBlendClumpFindFrame(RpClump *clump, const char *name);
-void RpAnimBlendClumpInit(RpClump*);
+void RpAnimBlendClumpFillFrameArray(RpClump *clump, AnimBlendFrameData **frames);
+void RpAnimBlendClumpInit(RpClump *);
+bool RpAnimBlendClumpIsInitialized(RpClump *clump);
+void RpAnimBlendClumpSetBlendDeltas(RpClump *clump, uint mask, float delta);
+void RpAnimBlendClumpRemoveAllAssociations(RpClump *clump);
+void RpAnimBlendClumpRemoveAssociations(RpClump *clump, uint mask);
+CAnimBlendAssociation *RpAnimBlendClumpGetAssociation(RpClump *clump, uint mask);
+CAnimBlendAssociation *RpAnimBlendClumpGetMainAssociation(RpClump *clump, CAnimBlendAssociation **, float *);
+CAnimBlendAssociation *RpAnimBlendClumpGetMainPartialAssociation(RpClump *clump);
+CAnimBlendAssociation *RpAnimBlendClumpGetMainAssociation_N(RpClump *clump, int n);
+CAnimBlendAssociation *RpAnimBlendClumpGetMainPartialAssociation_N(RpClump *clump, int n);
+CAnimBlendAssociation *RpAnimBlendClumpGetFirstAssociation(RpClump *clump, uint mask);
+CAnimBlendAssociation *RpAnimBlendGetNextAssociation(CAnimBlendAssociation *assoc);
+CAnimBlendAssociation *RpAnimBlendGetNextAssociation(CAnimBlendAssociation *assoc, uint mask);
 
 struct RFrame {
 	CQuaternion rot;
@@ -298,10 +318,7 @@ struct AnimBlendFrameData
 {
 	int flag;
 	RwV3d pos;
-	union {
-		RwFrame *frame;
-		RpHAnimKeyFrame *hanimframe;
-	};
+	RwFrame *frame;
 };
 
 // complete
@@ -335,6 +352,7 @@ struct AnimAssocDefinition
 	} *animInfoList;
 };
 
+// complete
 class CAnimManager
 {
 public:
