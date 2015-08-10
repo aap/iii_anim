@@ -281,6 +281,8 @@ CAnimManager::LoadAnimFile(int fd, bool removeUncompressed)
 				CFileMgr::Read(fd, &anim, sizeof(IfpHeader));
 				ROUNDSIZE(anim.size);
 				CFileMgr::Read(fd, buf, anim.size);
+				if(anim.size == 44)
+					seq->SetBoneTag(*(int*)(buf+40));
 				seq->SetName(buf);
 				int numFrames = *(int*)(buf+28);
 				if(numFrames == 0)

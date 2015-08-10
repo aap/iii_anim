@@ -39,11 +39,11 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>C:\Users\aap\Desktop\RWSDK\RW3.4\include\d3d8;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\aap\Desktop\RWSDK\RW3.3\Graphics\rwsdk\include\d3d8;$(IncludePath)</IncludePath>
     <TargetExt>.asi</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>C:\Users\aap\Desktop\RWSDK\RW3.4\include\d3d8;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\aap\Desktop\RWSDK\RW3.3\Graphics\rwsdk\include\d3d8;$(IncludePath)</IncludePath>
     <TargetExt>.asi</TargetExt>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -93,6 +93,8 @@
     <ClCompile Include="frameUpdate.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="RpAnimBlend.cpp" />
+    <ClCompile Include="rw.cpp" />
+    <ClCompile Include="skin.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

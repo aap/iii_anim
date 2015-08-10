@@ -14,6 +14,7 @@ CAnimBlendSequence::ctor(void)
 	this->numFrames = 0;
 	this->keyFrames = NULL;
 	this->keyFramesCompressed = NULL;
+	this->boneTag = -1;
 }
 
 void
@@ -21,7 +22,7 @@ CAnimBlendSequence::dtor(void)
 {
 	this->vtable = &CAnimBlendSequence_VTable;
 	if(this->keyFrames)
-		((void (*)(void*))(*(RwEngineInst + 0x4d)))(this->keyFrames);
+		RwFree(this->keyFrames);
 }
 
 void
@@ -44,18 +45,23 @@ CAnimBlendSequence::SetName(const char *name)
 }
 
 void
+CAnimBlendSequence::SetBoneTag(int tag)
+{
+	this->boneTag = tag;
+}
+
+void
 CAnimBlendSequence::SetNumFrames(int numFrames, bool TS)
 {
 	void *frames;
-	void *(*rwmalloc)(int) = ((void *(*)(int))(*(RwEngineInst + 0x4c)));
 	if(!TS){
 		// just rotation
 		this->flag |= 1;
-		frames = rwmalloc(sizeof(RFrame) * numFrames);
+		frames = RwMalloc(sizeof(RFrame) * numFrames);
 	}else{
 		// rotation and translate (ignore scale)
 		this->flag |= 3;
-		frames = rwmalloc(sizeof(RTFrame) * numFrames);
+		frames = RwMalloc(sizeof(RTFrame) * numFrames);
 	}
 	this->keyFrames = frames;
 	this->numFrames = numFrames;

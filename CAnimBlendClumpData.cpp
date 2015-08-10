@@ -28,7 +28,7 @@ CAnimBlendClumpData::dtor(void)
 }
 
 void
-CAnimBlendClumpData::SetNumberOfFrames(int n)
+CAnimBlendClumpData::SetNumberOfBones(int n)
 {
 	if(this->frames)
 		RwFreeAlign(this->frames);

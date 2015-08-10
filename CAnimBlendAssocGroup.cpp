@@ -55,7 +55,6 @@ CAnimBlendAssocGroup::CreateAssociations(const char *name, RpClump *clump, char 
 {
 	if(this->assocList)
 		dtor();
-
 	CAnimBlock *animBlock = CAnimManager::GetAnimationBlock(name);
 	void *mem = gta_nw(sizeof(CAnimBlendAssociation) * numAnims + 8);
 	this->assocList = (CAnimBlendAssociation *)construct_array(

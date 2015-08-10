@@ -15,7 +15,8 @@
 
 typedef unsigned int uint;
 
-extern void **&RwEngineInst;
+#define RwEngineInstance (*rwengine)
+extern void **rwengine;
 
 void *RwMallocAlign(uint size, int alignment);
 void RwFreeAlign(void*);
@@ -23,6 +24,8 @@ void gtadelete(void*);
 void *gta_nw(int);
 
 void *GetModelFromName(char *name);
+RpAtomic *GetFirstAtomic(RpClump *clump);
+RpAtomic *IsClumpSkinned(RpClump*);
 
 extern void **CModelInfo__ms_modelInfoPtrs;
 
@@ -112,7 +115,12 @@ struct AnimBlendFrameData;
 class CAnimBlendClumpData;
 class CAnimManager;
 
+RpClump *__fastcall CClumpModelInfo__CreateInstance(int self);
+void __fastcall CClumpModelInfo__SetClump(int self, int, RpClump *clump);
+void __fastcall CPedModelInfo__SetClump(int self, int, RpClump *clump);
+
 void FrameUpdateCallBack(AnimBlendFrameData *frame, void *arg);
+void FrameUpdateCallBackSkinned(AnimBlendFrameData *frame, void *arg);
 
 extern int &ClumpOffset;
 extern CAnimBlendClumpData *&gpAnimBlendClump;
@@ -135,6 +143,8 @@ CAnimBlendAssociation *RpAnimBlendClumpGetMainPartialAssociation_N(RpClump *clum
 CAnimBlendAssociation *RpAnimBlendClumpGetFirstAssociation(RpClump *clump, uint mask);
 CAnimBlendAssociation *RpAnimBlendGetNextAssociation(CAnimBlendAssociation *assoc);
 CAnimBlendAssociation *RpAnimBlendGetNextAssociation(CAnimBlendAssociation *assoc, uint mask);
+
+RpClump *createInstance_hook(RpClump *clump);
 
 struct RFrame {
 	CQuaternion rot;
@@ -182,6 +192,7 @@ public:
 	int numFrames;
 	void *keyFrames;
 	void *keyFramesCompressed;
+	int boneTag;	// can't insert in the middle, code assumes this layout but no size
 
 	CAnimBlendSequence(void);
 	~CAnimBlendSequence(void);
@@ -189,6 +200,7 @@ public:
 	void dtor(void);
 	void dtor2(char flag);
 	void SetName(const char *name);
+	void SetBoneTag(int tag);
 	void SetNumFrames(int numFrames, bool TS);
 	void RemoveQuaternionFlips(void);
 };
@@ -318,7 +330,11 @@ struct AnimBlendFrameData
 {
 	int flag;
 	RwV3d pos;
-	RwFrame *frame;
+	union {
+		RwFrame *frame;
+		RpHAnimStdKeyFrame *hanimframe;
+	};
+	int nodeID;
 };
 
 // complete
@@ -335,7 +351,7 @@ public:
 	~CAnimBlendClumpData(void);
 	void ctor(void);
 	void dtor(void);
-	void SetNumberOfFrames(int n);
+	void SetNumberOfBones(int n);
 	void ForAllFrames(void (*cb)(AnimBlendFrameData*, void*), void *arg);
 };
 

@@ -2,19 +2,30 @@
 
 HMODULE dllModule, hDummyHandle;
 
-void **&RwEngineInst = *(void***)0x661228;
+void **rwengine = *(void***)0x59EEB1;
 
 WRAPPER void *RwMallocAlign(uint, int) { EAXJMP(0x526FD0); }
 WRAPPER void RwFreeAlign(void*) { EAXJMP(0x527000); }
 WRAPPER void gtadelete(void*) { EAXJMP(0x5A07E0); }
 WRAPPER void *gta_nw(int) { EAXJMP(0x5A0690); }
 
-WRAPPER RwMatrix *RwMatrixUpdate(RwMatrix * matrix) { EAXJMP(0x5A28E0); }
+WRAPPER RwMatrix *RwMatrixUpdate(RwMatrix*) { EAXJMP(0x5A28E0); }
+WRAPPER RwMatrix *RwMatrixInvert(RwMatrix*, const RwMatrix*) { EAXJMP(0x5A2C90); }
+WRAPPER RwBool RpHAnimHierarchyUpdateMatrices(RpHAnimHierarchy *hierarchy) { EAXJMP(0x5B1780); }
 WRAPPER RwFrame *RwFrameForAllChildren(RwFrame*, RwFrameCallBack, void*) { EAXJMP(0x5A1FC0); }
 WRAPPER RwFrame *RwFrameUpdateObjects(RwFrame*) { EAXJMP(0x5A1C60); }
 WRAPPER RwBool RpClumpDestroy(RpClump*) { EAXJMP(0x59F500); }
+WRAPPER RpClump *RpClumpForAllAtomics(RpClump*, RpAtomicCallBack, void*) { EAXJMP(0x59EDD0); }
+WRAPPER RpClump *RpClumpClone(RpClump*) { EAXJMP(0x59F1B0); }
+WRAPPER RpSkin *RpSkinGeometryGetSkin(RpGeometry*) { EAXJMP(0x5B1080); }
+WRAPPER RpAtomic *RpSkinAtomicSetHAnimHierarchy(RpAtomic*, RpHAnimHierarchy*) { EAXJMP(0x5B1050); }
+WRAPPER RpHAnimHierarchy *RpSkinAtomicGetHAnimHierarchy(const RpAtomic*) { EAXJMP(0x5B1070); }
+WRAPPER RpHAnimHierarchy *RpHAnimFrameGetHierarchy(RwFrame*) { EAXJMP(0x5B11F0); }
+WRAPPER RwBool RpHAnimHierarchySetCurrentAnim(RpHAnimHierarchy*, RpHAnimAnimation*) { EAXJMP(0x5B1200); }
+WRAPPER RwV3d *RwV3dTransformPoints(RwV3d*, const RwV3d*, RwInt32, const RwMatrix*) { EAXJMP(0x5A37D0); }
 
 WRAPPER void *GetModelFromName(char *name) { EAXJMP(0x4010D0); }
+WRAPPER RpAtomic *GetFirstAtomic(RpClump *clump) { EAXJMP(0x526420); }
 WRAPPER int CFileMgr::OpenFile(const char*, const char*) { EAXJMP(0x479100); }
 WRAPPER int CFileMgr::Read(int, void*, int) { EAXJMP(0x479140); }
 WRAPPER void CFileMgr::Seek(int, int, int) { EAXJMP(0x479180); }
@@ -57,14 +68,35 @@ lcstrcmp(const char *s1, const char *s2)
 	return 0;
 }
 
+RpAtomic*
+isSkinnedCb(RpAtomic *atomic, void *data)
+{
+	RpAtomic **ret = (RpAtomic **)data;
+	if(*ret)
+		return NULL;
+	if(RpSkinGeometryGetSkin(atomic->geometry))
+		*ret = atomic;
+	return atomic;
+}
+
+RpAtomic*
+IsClumpSkinned(RpClump *c)
+{
+//	return NULL;
+	RpAtomic *ret = NULL;
+	RpClumpForAllAtomics(c, isSkinnedCb, &ret);
+	return ret;
+}
+
 void
 patch10(void)
 {
-	if(sizeof(CAnimBlendSequence) != 0x2C ||
+/*
+	if(sizeof(CAnimBlendSequence) != 0x2C ||		//
 	   sizeof(CAnimBlendHierarchy) != 0x28 ||
 	   sizeof(CAnimBlock) != 0x20 ||
 	   sizeof(CAnimBlendNode) != 0x1C ||
-	   sizeof(CAnimBlendAssociation) != 0x40 ||
+	   sizeof(CAnimBlendAssociation) != 0x40 ||		//
 	   sizeof(CAnimBlendAssocGroup) != 0x8 ||
 	   sizeof(AnimBlendFrameData) != 0x14 ||
 	   sizeof(CAnimBlendClumpData) != 0x14 ||
@@ -74,6 +106,7 @@ patch10(void)
 		return;
 	}
 	printf("sizes ok\n");
+*/
 
 	MemoryVP::InjectHook(0x401000, &CAnimBlendAssocGroup::ctor, PATCH_JUMP);
 	MemoryVP::InjectHook(0x401130, static_cast<void(CAnimBlendAssocGroup::*)(const char*)>(&CAnimBlendAssocGroup::CreateAssociations), PATCH_JUMP);
@@ -103,7 +136,7 @@ patch10(void)
 
 	MemoryVP::InjectHook(0x401880, &CAnimBlendClumpData::ctor, PATCH_JUMP);
 	MemoryVP::InjectHook(0x4018B0, &CAnimBlendClumpData::dtor, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4018F0, &CAnimBlendClumpData::SetNumberOfFrames, PATCH_JUMP);
+	MemoryVP::InjectHook(0x4018F0, &CAnimBlendClumpData::SetNumberOfBones, PATCH_JUMP);
 	MemoryVP::InjectHook(0x401930, &CAnimBlendClumpData::ForAllFrames, PATCH_JUMP);
 
 	MemoryVP::InjectHook(0x4019A0, &CAnimBlendHierarchy::Shutdown, PATCH_JUMP);
@@ -165,6 +198,10 @@ patch10(void)
 	MemoryVP::InjectHook(0x405750, (CAnimBlendAssociation *(*)(RpClump*, uint))RpAnimBlendClumpGetFirstAssociation, PATCH_JUMP);
 	MemoryVP::InjectHook(0x405780, (CAnimBlendAssociation *(*)(CAnimBlendAssociation*))RpAnimBlendGetNextAssociation, PATCH_JUMP);
 	MemoryVP::InjectHook(0x4057A0, (CAnimBlendAssociation *(*)(CAnimBlendAssociation*, uint))RpAnimBlendGetNextAssociation, PATCH_JUMP);
+
+	MemoryVP::InjectHook(0x4F8920, CClumpModelInfo__CreateInstance, PATCH_JUMP);
+	MemoryVP::InjectHook(0x4F8830, CClumpModelInfo__SetClump, PATCH_JUMP);
+	MemoryVP::InjectHook(0x510210, CPedModelInfo__SetClump, PATCH_JUMP);
 }
 
 BOOL WINAPI

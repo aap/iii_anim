@@ -235,3 +235,254 @@ FrameUpdateCallBack(AnimBlendFrameData *frame, void *arg)
 	}
 	RwMatrixUpdate(mat);
 }
+
+
+void
+FrameUpdateCallBackSkinnedWith3dVelocityExtraction(AnimBlendFrameData *frame, CAnimBlendNode **nodes)
+{
+	CVector vec, pos;
+	CQuaternion q, rot;
+	float totalBlendAmount = 0.0f;
+	float x = 0.0f, y = 0.0f, z = 0.0f;
+	float curx = 0.0f, cury = 0.0f, curz = 0.0f;
+	float endx = 0.0f, endy = 0.0f, endz = 0.0f;
+	rot.x = rot.y = rot.z = rot.w = 0.0f;
+	pos.x = pos.y = pos.z = 0.0f;
+	bool looped = false;
+	RpHAnimStdKeyFrame *frameData = frame->hanimframe;
+	CAnimBlendNode **node;
+
+	if(*nodes){
+		node = nodes+1;
+		do{
+			if((*node)->sequence && ((*node)->blendAssoc->flags & CAnimBlendAssociation::Partial))
+				totalBlendAmount += (*node)->blendAssoc->blendAmount;
+			node++;
+		}while(*node);
+	}
+
+	node = nodes+1;
+	do{
+		if((*node)->sequence && (*node)->sequence->flag & 2 && (*node)->blendAssoc->flags & 0x40){
+			(*node)->GetCurrentTranslation(&vec, 1.0f-totalBlendAmount);
+			curx += vec.x;
+			cury += vec.y;
+			curz += vec.z;
+		}
+		node++;
+	}while(*node);
+
+	node = nodes+1;
+	do{
+		if((*node)->sequence){
+			bool nodelooped = (*node)->Update(vec, q, 1.0f-totalBlendAmount);
+			if(q.x*rot.x + q.y*rot.y + q.z*rot.z + q.w*rot.w < 0.0f)
+				rot.Sub(q);
+			else
+				rot.Add(q);
+			if((*node)->sequence->flag & 2){
+				pos.Add(vec);
+				if((*node)->blendAssoc->flags & 0x40){
+					x += vec.x;
+					y += vec.y;
+					z += vec.z;
+					looped |= nodelooped;
+					if(nodelooped){
+						(*node)->GetEndTranslation(&vec, 1.0f-totalBlendAmount);
+						endx += vec.x;
+						endy += vec.y;
+						endz += vec.z;
+					}
+				}
+			}
+		}
+		++*node;
+		node++;
+	}while(*node);
+
+	if(!(frame->flag & 2)){
+		float norm = rot.x*rot.x + rot.y*rot.y + rot.z*rot.z + rot.w*rot.w;
+		if(norm == 0.0f)
+			rot.w = 1.0f;
+		else
+			rot.Mult(1.0f/sqrt(norm));
+		frameData->q.imag.x = rot.x;
+		frameData->q.imag.y = rot.y;
+		frameData->q.imag.z = rot.z;
+		frameData->q.real = rot.w;
+	}
+
+	if(!(frame->flag & 4)){
+		gpAnimBlendClump->d[0] = x - curx;
+		gpAnimBlendClump->d[1] = y - cury;
+		gpAnimBlendClump->d[2] = z - curz;
+		if(looped){
+			gpAnimBlendClump->d[0] += endx;
+			gpAnimBlendClump->d[1] += endy;
+			gpAnimBlendClump->d[2] += endz;
+		}
+		frameData->t.x = pos.x - x + frame->pos.x;
+		frameData->t.y = pos.y - y + frame->pos.y;
+		frameData->t.z = pos.z - z + frame->pos.z;
+	}	
+}
+
+void
+FrameUpdateCallBackSkinnedWithVelocityExtraction(AnimBlendFrameData *frame, CAnimBlendNode **nodes)
+{
+	CVector vec, pos;
+	CQuaternion q, rot;
+	float totalBlendAmount = 0.0f;
+	float x = 0.0f, y = 0.0f;
+	float curx = 0.0f, cury = 0.0f;
+	float endx = 0.0f, endy = 0.0f;
+	rot.x = rot.y = rot.z = rot.w = 0.0f;
+	pos.x = pos.y = pos.z = 0.0f;
+	bool looped = false;
+	RpHAnimStdKeyFrame *frameData = frame->hanimframe;
+	CAnimBlendNode **node;
+
+	if(*nodes){
+		node = nodes+1;
+		do{
+			if((*node)->sequence && ((*node)->blendAssoc->flags & CAnimBlendAssociation::Partial))
+				totalBlendAmount += (*node)->blendAssoc->blendAmount;
+			node++;
+		}while(*node);
+	}
+
+	node = nodes+1;
+	do{
+		if((*node)->sequence && (*node)->sequence->flag & 2 && (*node)->blendAssoc->flags & 0x40){
+			(*node)->GetCurrentTranslation(&vec, 1.0f-totalBlendAmount);
+			cury += vec.y;
+			if((*node)->blendAssoc->flags & 0x80)
+				curx += vec.x;
+		}
+		node++;
+	}while(*node);
+
+	node = nodes+1;
+	do{
+		if((*node)->sequence){
+			bool nodelooped = (*node)->Update(vec, q, 1.0f-totalBlendAmount);
+			if(q.x*rot.x + q.y*rot.y + q.z*rot.z + q.w*rot.w < 0.0f)
+				rot.Sub(q);
+			else
+				rot.Add(q);
+			if((*node)->sequence->flag & 2){
+				pos.Add(vec);
+				if((*node)->blendAssoc->flags & 0x40){
+					y += vec.y;
+					if((*node)->blendAssoc->flags & 0x80)
+						x += vec.x;
+					looped |= nodelooped;
+					if(nodelooped){
+						(*node)->GetEndTranslation(&vec, 1.0f-totalBlendAmount);
+						endy += vec.y;
+						if((*node)->blendAssoc->flags & 0x80)
+							endx += vec.x;
+					}
+				}
+			}
+		}
+		++*node;
+		node++;
+	}while(*node);
+
+	if(!(frame->flag & 2)){
+		float norm = rot.x*rot.x + rot.y*rot.y + rot.z*rot.z + rot.w*rot.w;
+		if(norm == 0.0f)
+			rot.w = 1.0f;
+		else
+			rot.Mult(1.0f/sqrt(norm));
+		frameData->q.imag.x = rot.x;
+		frameData->q.imag.y = rot.y;
+		frameData->q.imag.z = rot.z;
+		frameData->q.real = rot.w;
+	}
+
+	if(!(frame->flag & 4)){
+		gpAnimBlendClump->d[0] = x - curx;
+		gpAnimBlendClump->d[1] = y - cury;
+		if(looped){
+			gpAnimBlendClump->d[0] += endx;
+			gpAnimBlendClump->d[1] += endy;
+		}
+		frameData->t.x = pos.x - x;
+		frameData->t.y = pos.y - y;
+		frameData->t.z = pos.z;
+		if(frameData->t.z >= -0.8f)
+			if(frameData->t.z >= -0.4f)
+				frameData->t.z += frame->pos.z;
+			else
+				frameData->t.z += (2.5f * frameData->t.z + 2.0f) * frame->pos.z;
+		frameData->t.x += frame->pos.x;
+		frameData->t.y += frame->pos.y;
+	}	
+}
+
+void
+FrameUpdateCallBackSkinned(AnimBlendFrameData *frame, void *arg)
+{
+	CAnimBlendNode **nodes = (CAnimBlendNode**)arg;
+	CVector vec, pos;
+	CQuaternion q, rot;
+	float totalBlendAmount = 0.0f, posBlendAmount = 0.0f;
+	rot.x = rot.y = rot.z = rot.w = 0.0f;
+	pos.x = pos.y = pos.z = 0.0f;
+	RpHAnimStdKeyFrame *frameData = frame->hanimframe;
+	CAnimBlendNode **node;
+
+	if (frame->flag & 8 && gpAnimBlendClump->d){
+		if(frame->flag & 0x10)
+			FrameUpdateCallBackSkinnedWith3dVelocityExtraction(frame, nodes);
+		else
+			FrameUpdateCallBackSkinnedWithVelocityExtraction(frame, nodes);
+		return;
+	}
+
+	if(*nodes){
+		node = nodes+1;
+		do{
+			if((*node)->sequence && ((*node)->blendAssoc->flags & CAnimBlendAssociation::Partial))
+				totalBlendAmount += (*node)->blendAssoc->blendAmount;
+			node++;
+		}while(*node);
+	}
+
+	node = nodes+1;
+	do{
+		if((*node)->sequence){
+			bool nodelooped = (*node)->Update(vec, q, 1.0f-totalBlendAmount);
+			if(q.x*rot.x + q.y*rot.y + q.z*rot.z + q.w*rot.w < 0.0f)
+				rot.Sub(q);
+			else
+				rot.Add(q);
+			if((*node)->sequence->flag & 2){
+				pos.Add(vec);
+				posBlendAmount += (*node)->blendAssoc->blendAmount;
+			}
+		}
+		++*node;
+		node++;
+	}while(*node);
+
+	if(!(frame->flag & 2)){
+		float norm = rot.x*rot.x + rot.y*rot.y + rot.z*rot.z + rot.w*rot.w;
+		if(norm == 0.0f)
+			rot.w = 1.0f;
+		else
+			rot.Mult(1.0f/sqrt(norm));
+		frameData->q.imag.x = rot.x;
+		frameData->q.imag.y = rot.y;
+		frameData->q.imag.z = rot.z;
+		frameData->q.real = rot.w;
+	}
+
+	if(!(frame->flag & 4)){
+		frameData->t.x = posBlendAmount * pos.x + frame->pos.x * (1.0f - posBlendAmount);
+		frameData->t.y = posBlendAmount * pos.y + frame->pos.y * (1.0f - posBlendAmount);
+		frameData->t.z = posBlendAmount * pos.z + frame->pos.z * (1.0f - posBlendAmount);
+	}
+}
