@@ -28,6 +28,12 @@ RpHAnimAnimationCreate(RwInt32 typeID, RwInt32 numFrames, RwInt32 flags, RwReal 
 	return anim;
 }
 
+RwMatrix*
+RpHAnimHierarchyGetMatrixArray(RpHAnimHierarchy *hierarchy)
+{
+	return hierarchy->pMatrixArray;
+}
+
 RwInt32
 RpHAnimIDGetIndex(RpHAnimHierarchy *hierarchy, RwInt32 ID)
 {
@@ -35,6 +41,21 @@ RpHAnimIDGetIndex(RpHAnimHierarchy *hierarchy, RwInt32 ID)
 		if(hierarchy->pNodeInfo[i].nodeID == ID)
 			return i;
 	return -1;
+}
+
+RpHAnimAtomicGlobalVars &RpHAnimAtomicGlobals_ = *(RpHAnimAtomicGlobalVars*)0x9405A8;
+
+RwInt32
+RpHAnimFrameGetID(RwFrame *frame)
+{
+	return *RWPLUGINOFFSET(RwInt32, frame, RpHAnimAtomicGlobals_.engineOffset);
+}
+
+RwBool
+RpHAnimFrameSetID(RwFrame *frame, RwInt32 id)
+{
+	*RWPLUGINOFFSET(RwInt32, frame, RpHAnimAtomicGlobals_.engineOffset) = id;
+	return 1;
 }
 
 const RwMatrixWeights*

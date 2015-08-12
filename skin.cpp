@@ -51,11 +51,23 @@ CClumpModelInfo__CreateInstance(int self)
 	RpClump *clump = *(RpClump**)(self + 48);
 	if(clump == NULL)
 		return NULL;
+
 	RpClump *clone2 = RpClumpClone(clump);
-	RpClump *clone = RpClumpClone(clone2);	// to reverse order of atomics again...
+	RpClump *clone = RpClumpClone(clone2);	// to reverse order of... something again...
 	RpClumpDestroy(clone2);
-	if(IsClumpSkinned(clone)){
+//	clone = clone2;
+
+//	RpClump *clone = RpClumpClone(clump);
+	RpAtomic *atomic;
+	if(atomic = IsClumpSkinned(clone)){
+//		atomicsToArray(clump);
+//		atomicsToArray(clone2);
+//		int count1 = atomicArraySP;
+//		atomicsToArray(clone);
+//		int count2 = atomicArraySP;
+//		assert(count1 == count2);
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromClump(clone);
+//		RpSkinAtomicSetHAnimHierarchy(atomic, hier);
 		RpClumpForAllAtomics(clone, SetHierarchyForSkinAtomic, hier);	// first atomic hardcoded!!
 		RpHAnimAnimation *anim = HAnimAnimationCreateForHierarchy(hier);
 		RpHAnimHierarchySetCurrentAnim(hier, anim);
@@ -83,13 +95,12 @@ CClumpModelInfo__SetClump(int self, int, RpClump *clump)
 
 	if(IsClumpSkinned(clump)){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromClump(clump);
-//		RwFrameForAllChildren(RpClumpGetFrame(clump), GetAnimHierarchyFromClumpCB, &hier);
 		// mobile
-//		RpClumpForAllAtomics(clump, SetHierarchyForSkinAtomic, hier);
-//		RpAtomic *atomic = GetFirstAtomic(clump);
+		RpClumpForAllAtomics(clump, SetHierarchyForSkinAtomic, hier);
+		RpAtomic *atomic = GetFirstAtomic(clump);
 		// Xbox
-		RpAtomic *atomic = IsClumpSkinned(clump);
-		RpSkinAtomicSetHAnimHierarchy(atomic, hier);
+//		RpAtomic *atomic = IsClumpSkinned(clump);
+//		RpSkinAtomicSetHAnimHierarchy(atomic, hier);
 
 		RpSkin *skin = RpSkinGeometryGetSkin(atomic->geometry);
 		// ignore const, lol
@@ -106,6 +117,40 @@ CClumpModelInfo__SetClump(int self, int, RpClump *clump)
 	}
 }
 
+RpAtomic *limbAtomics[3];
+
+struct LimbCBarg {
+	int pedmodelinfo;
+	RpClump *clump;
+	RwInt32 id[3];
+};
+
+RpAtomic*
+CPedModelInfo__findLimbsCb(RpAtomic *atomic, void *data)
+{
+	LimbCBarg *limbs = (LimbCBarg*)data;
+	RwFrame *frame = RpAtomicGetFrame(atomic);
+	const char *name = GetFrameNodeName(frame);
+	if(lcstrcmp(name, "Shead01") == 0){
+		RpHAnimFrameSetID(frame, 0x1000);
+		limbs->id[0] = RpHAnimFrameGetID(frame);
+		limbAtomics[0] = atomic;
+	}else if(lcstrcmp(name, "SLhand01") == 0){
+		RpHAnimFrameSetID(frame, 0x1001);
+		limbs->id[1] = RpHAnimFrameGetID(frame);
+		limbAtomics[1] = atomic;
+	}else if(lcstrcmp(name, "SRhand01") == 0){
+		RpHAnimFrameSetID(frame, 0x1002);
+		limbs->id[2] = RpHAnimFrameGetID(frame);
+		limbAtomics[2] = atomic;
+	}else
+		return atomic;
+	RpClumpRemoveAtomic(limbs->clump, atomic);
+	RwFrameRemoveChild(frame);
+//	atomic->renderCallBack(atomic);	// wtf? android does this...for instancing or what?
+	return atomic;
+}
+
 void __fastcall
 CPedModelInfo__SetClump(int self, int, RpClump *clump)
 {
@@ -118,7 +163,14 @@ CPedModelInfo__SetClump(int self, int, RpClump *clump)
 		RpClumpForAllAtomics(clump, (RpAtomicCallBack)0x4F8940, (void*)0x528B30);	// CClumpModelInfo::SetAtomicRendererCB, CVisibilityPlugins::RenderPlayerCB
 */
 	if(IsClumpSkinned(clump)){
-		// TODO: find (and detach) limbs
+		LimbCBarg limbs = { self, clump, 0, 0, 0 };
+		RpClumpForAllAtomics(clump, CPedModelInfo__findLimbsCb, &limbs);
+		RpAtomic *skinned = GetFirstAtomic(clump);
+		RpClumpRemoveAtomic(clump, skinned);
+		RpClumpAddAtomic(clump, limbAtomics[0]);
+		RpClumpAddAtomic(clump, limbAtomics[1]);
+		RpClumpAddAtomic(clump, limbAtomics[2]);
+		RpClumpAddAtomic(clump, skinned);
 	}
 	CClumpModelInfo__SetClump(self, 0, clump);
 	CClumpModelInfo__SetFrameIds(self, 0, 0x5FE7A4);	// CPedModelInfo::m_pPedIds
@@ -128,4 +180,29 @@ CPedModelInfo__SetClump(int self, int, RpClump *clump)
 	if(strcmp((char*)(self+4), "player") == 0)
 		RpClumpForAllAtomics(clump, (RpAtomicCallBack)0x4F8940, (void*)0x528B30);	// CClumpModelInfo::SetAtomicRendererCB, CVisibilityPlugins::RenderPlayerCB
 
+}
+
+/* indices:  SHead01: 2
+             SLHand01: 5
+             SRHand01: 6
+*/
+
+void
+updateLimbs(RpClump *clump)
+{
+//	static RwInt32 indices[] = { 2, 5, 6 };
+	static RwInt32 indices[] = { 9, 15, 12 };
+	atomicsToArray(clump);
+	RpHAnimHierarchy *hier = GetAnimHierarchyFromClump(clump);
+	RwMatrix *matrices = RpHAnimHierarchyGetMatrixArray(hier);
+	for(int i = 1; i < atomicArraySP; i++){
+		RpAtomic *atomic = atomicArray[i];
+		RwFrame *frame = RpAtomicGetFrame(atomic);
+		RwInt32 id = RpHAnimFrameGetID(frame);
+//		RwInt32 idx = indices[id-0x1000];
+		RwInt32 idx = RpHAnimIDGetIndex(hier, indices[id-0x1000]);
+//		RwMatrixTransform(RwFrameGetMatrix(frame), &matrices[idx], rwCOMBINEREPLACE);
+		memcpy(RwFrameGetMatrix(frame), &matrices[idx], 64);
+		RwFrameUpdateObjects(frame);
+	}
 }

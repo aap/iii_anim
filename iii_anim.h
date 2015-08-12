@@ -23,6 +23,7 @@ void RwFreeAlign(void*);
 void gtadelete(void*);
 void *gta_nw(int);
 
+const char *GetFrameNodeName(RwFrame *frame);
 void *GetModelFromName(char *name);
 RpAtomic *GetFirstAtomic(RpClump *clump);
 RpAtomic *IsClumpSkinned(RpClump*);
@@ -130,6 +131,7 @@ class CAnimManager;
 RpClump *__fastcall CClumpModelInfo__CreateInstance(int self);
 void __fastcall CClumpModelInfo__SetClump(int self, int, RpClump *clump);
 void __fastcall CPedModelInfo__SetClump(int self, int, RpClump *clump);
+void updateLimbs(RpClump *clump);
 
 void FrameUpdateCallBack(AnimBlendFrameData *frame, void *arg);
 void FrameUpdateCallBackSkinned(AnimBlendFrameData *frame, void *arg);

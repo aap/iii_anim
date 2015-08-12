@@ -1,7 +1,6 @@
 #include "iii_anim.h"
 
 WRAPPER RwFrame *FrameForAllChildrenCountCallBack(RwFrame*, void*) { EAXJMP(0x405310); }
-WRAPPER const char *GetFrameNodeName(RwFrame *frame) { EAXJMP(0x527150); }
 
 int &ClumpOffset = *(int*)0x8F1B84;
 WRAPPER int CVisibilityPlugins__GetFrameHierarchyId(RwFrame*) { EAXJMP(0x528D80); }
@@ -53,8 +52,11 @@ RpAnimBlendClumpUpdateAnimations(RpClump *clump, float timeDelta, bool doRender)
 
 	if(IsClumpSkinned(clump)){
 		clumpData->ForAllFrames(FrameUpdateCallBackSkinned, nodes);
+//		atomicsToArray(clump);
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(clump);
 		RpHAnimHierarchyUpdateMatrices(hier);
+//		RpHAnimHierarchyUpdateMatrices(hier);
+		updateLimbs(clump);
 	}else
 		clumpData->ForAllFrames(FrameUpdateCallBack, nodes);
 
@@ -209,8 +211,8 @@ SkinGetBonePositionsToTable(RpClump *clump, RwV3d *boneTable)
 	if(boneTable == NULL)
 		return;
 
-//	RpAtomic *atomic = GetFirstAtomic(clump);		// mobile
-	RpAtomic *atomic = IsClumpSkinned(clump);		// xbox
+	RpAtomic *atomic = GetFirstAtomic(clump);		// mobile
+//	RpAtomic *atomic = IsClumpSkinned(clump);		// xbox
 	RpSkin *skin = RpSkinGeometryGetSkin(atomic->geometry);
 	RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(clump);
 	boneTable[0].x = boneTable[0].y = boneTable[0].z = 0.0f;
