@@ -356,7 +356,7 @@ FrameUpdateCallBackSkinnedWithVelocityExtraction(AnimBlendFrameData *frame, CAni
 		if((*node)->sequence && (*node)->sequence->flag & 2 && (*node)->blendAssoc->flags & 0x40){
 			(*node)->GetCurrentTranslation(&vec, 1.0f-totalBlendAmount);
 			cury += vec.y;
-			if((*node)->blendAssoc->flags & 0x80)
+			if((*node)->blendAssoc->flags & 0x1000)
 				curx += vec.x;
 		}
 		node++;
@@ -374,13 +374,13 @@ FrameUpdateCallBackSkinnedWithVelocityExtraction(AnimBlendFrameData *frame, CAni
 				pos.Add(vec);
 				if((*node)->blendAssoc->flags & 0x40){
 					y += vec.y;
-					if((*node)->blendAssoc->flags & 0x80)
+					if((*node)->blendAssoc->flags & 0x1000)
 						x += vec.x;
 					looped |= nodelooped;
 					if(nodelooped){
 						(*node)->GetEndTranslation(&vec, 1.0f-totalBlendAmount);
 						endy += vec.y;
-						if((*node)->blendAssoc->flags & 0x80)
+						if((*node)->blendAssoc->flags & 0x1000)
 							endx += vec.x;
 					}
 				}

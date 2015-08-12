@@ -40,17 +40,17 @@ RpHAnimIDGetIndex(RpHAnimHierarchy *hierarchy, RwInt32 ID)
 const RwMatrixWeights*
 RpSkinGetVertexBoneWeights(RpSkin *skin)
 {
-	return *(RwMatrixWeights**)((char*)skin + 12);
+	return skin->weights;
 }
 
 const RwMatrix*
 RpSkinGetSkinToBoneMatrices(RpSkin *skin)
 {
-	return *(RwMatrix**)((char*)skin + 4);
+	return skin->inverseMatrices;
 }
 
 RwUInt32
 RpSkinGetNumBones(RpSkin *skin)
 {
-	return *(RwUInt32*)skin;
+	return skin->numBones;
 }

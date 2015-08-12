@@ -27,6 +27,18 @@ void *GetModelFromName(char *name);
 RpAtomic *GetFirstAtomic(RpClump *clump);
 RpAtomic *IsClumpSkinned(RpClump*);
 
+struct RpSkin
+{
+	RwUInt32 numBones;
+	RwMatrix *inverseMatrices;
+	RwUInt8 *indices;
+	RwMatrixWeights *weights;
+	RwInt32 maxWeightsUsed;
+	RwInt32 singleIndex;
+	void *data;
+};
+
+
 extern void **CModelInfo__ms_modelInfoPtrs;
 
 template<typename CT, typename DT> inline void*
@@ -144,7 +156,9 @@ CAnimBlendAssociation *RpAnimBlendClumpGetFirstAssociation(RpClump *clump, uint 
 CAnimBlendAssociation *RpAnimBlendGetNextAssociation(CAnimBlendAssociation *assoc);
 CAnimBlendAssociation *RpAnimBlendGetNextAssociation(CAnimBlendAssociation *assoc, uint mask);
 
-RpClump *createInstance_hook(RpClump *clump);
+extern RpAtomic *atomicArray[20];
+extern int atomicArraySP;
+void atomicsToArray(RpClump *clump);
 
 struct RFrame {
 	CQuaternion rot;

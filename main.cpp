@@ -68,7 +68,7 @@ lcstrcmp(const char *s1, const char *s2)
 	return 0;
 }
 
-RpAtomic*
+static RpAtomic*
 isSkinnedCb(RpAtomic *atomic, void *data)
 {
 	RpAtomic **ret = (RpAtomic **)data;
@@ -82,10 +82,25 @@ isSkinnedCb(RpAtomic *atomic, void *data)
 RpAtomic*
 IsClumpSkinned(RpClump *c)
 {
-//	return NULL;
 	RpAtomic *ret = NULL;
 	RpClumpForAllAtomics(c, isSkinnedCb, &ret);
 	return ret;
+}
+
+RpAtomic *atomicArray[20];
+int atomicArraySP = 0;
+
+static RpAtomic*
+atomicsToArrayCB(RpAtomic *atomic, void *)
+{
+	return atomicArray[atomicArraySP++] = atomic;
+}
+
+void
+atomicsToArray(RpClump *clump)
+{
+	atomicArraySP = 0;
+	RpClumpForAllAtomics(clump, atomicsToArrayCB, NULL);
 }
 
 void

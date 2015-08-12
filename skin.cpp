@@ -51,13 +51,16 @@ CClumpModelInfo__CreateInstance(int self)
 	RpClump *clump = *(RpClump**)(self + 48);
 	if(clump == NULL)
 		return NULL;
-	RpClump *clone = RpClumpClone(clump);
+	RpClump *clone2 = RpClumpClone(clump);
+	RpClump *clone = RpClumpClone(clone2);	// to reverse order of atomics again...
+	RpClumpDestroy(clone2);
 	if(IsClumpSkinned(clone)){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromClump(clone);
-		RpClumpForAllAtomics(clone, SetHierarchyForSkinAtomic, hier);
+		RpClumpForAllAtomics(clone, SetHierarchyForSkinAtomic, hier);	// first atomic hardcoded!!
 		RpHAnimAnimation *anim = HAnimAnimationCreateForHierarchy(hier);
 		RpHAnimHierarchySetCurrentAnim(hier, anim);
 		RpHAnimHierarchySetFlags(hier, rpHANIMHIERARCHYUPDATEMODELLINGMATRICES|rpHANIMHIERARCHYUPDATELTMS);
+		// Xbox has more some more code (skin related)
 	}
 	return clone;	
 }
@@ -74,14 +77,20 @@ CClumpModelInfo__SetClump(int self, int, RpClump *clump)
 	CVisibilityPlugins__SetClumpModelInfo(clump, self);
 	CBaseModelInfo__AddTexDictionaryRef(self);
 	RpClumpForAllAtomics(clump, (RpAtomicCallBack)0x4F8940, 0);	// CClumpModelInfo::SetAtomicRendererCB
+	// Xbox does something depending on *(self+42) here
 	if(strcmp((char*)(self+4), "playerh") == 0)
 		RpClumpForAllAtomics(clump, (RpAtomicCallBack)0x4F8940, (void*)0x528B30);	// CClumpModelInfo::SetAtomicRendererCB, CVisibilityPlugins::RenderPlayerCB
 
 	if(IsClumpSkinned(clump)){
-		RpHAnimHierarchy *hier;
-		RwFrameForAllChildren(RpClumpGetFrame(clump), GetAnimHierarchyFromClumpCB, &hier);
-		RpClumpForAllAtomics(clump, SetHierarchyForSkinAtomic, hier);
-		RpAtomic *atomic = GetFirstAtomic(clump);	// *not* what the xbox does :(
+		RpHAnimHierarchy *hier = GetAnimHierarchyFromClump(clump);
+//		RwFrameForAllChildren(RpClumpGetFrame(clump), GetAnimHierarchyFromClumpCB, &hier);
+		// mobile
+//		RpClumpForAllAtomics(clump, SetHierarchyForSkinAtomic, hier);
+//		RpAtomic *atomic = GetFirstAtomic(clump);
+		// Xbox
+		RpAtomic *atomic = IsClumpSkinned(clump);
+		RpSkinAtomicSetHAnimHierarchy(atomic, hier);
+
 		RpSkin *skin = RpSkinGeometryGetSkin(atomic->geometry);
 		// ignore const, lol
 		RwMatrixWeights *weights = (RwMatrixWeights*)RpSkinGetVertexBoneWeights(skin);
@@ -115,7 +124,7 @@ CPedModelInfo__SetClump(int self, int, RpClump *clump)
 	CClumpModelInfo__SetFrameIds(self, 0, 0x5FE7A4);	// CPedModelInfo::m_pPedIds
 	if(*(int*)(self + 68) == 0 && !IsClumpSkinned(clump))
 		CPedModelInfo__CreateHitColModel(self);
-
+	// Xbox
 	if(strcmp((char*)(self+4), "player") == 0)
 		RpClumpForAllAtomics(clump, (RpAtomicCallBack)0x4F8940, (void*)0x528B30);	// CClumpModelInfo::SetAtomicRendererCB, CVisibilityPlugins::RenderPlayerCB
 
