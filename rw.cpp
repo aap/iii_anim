@@ -28,6 +28,17 @@ RpHAnimAnimationCreate(RwInt32 typeID, RwInt32 numFrames, RwInt32 flags, RwReal 
 	return anim;
 }
 
+RpHAnimAnimation*
+RpHAnimAnimationDestroy(RpHAnimAnimation *animation)
+{
+	if(animation->pFrames){
+		RwFree(animation->pFrames);
+		animation->pFrames = NULL;
+	}
+	RwFreeListFree(RpHAnimAnimationFreeList, animation);
+	return animation;
+}
+
 RwMatrix*
 RpHAnimHierarchyGetMatrixArray(RpHAnimHierarchy *hierarchy)
 {

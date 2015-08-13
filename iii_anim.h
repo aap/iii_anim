@@ -15,6 +15,8 @@
 
 typedef unsigned int uint;
 
+void pedhooks(void);
+
 #define RwEngineInstance (*rwengine)
 extern void **rwengine;
 
@@ -27,6 +29,10 @@ const char *GetFrameNodeName(RwFrame *frame);
 void *GetModelFromName(char *name);
 RpAtomic *GetFirstAtomic(RpClump *clump);
 RpAtomic *IsClumpSkinned(RpClump*);
+RpHAnimHierarchy* GetAnimHierarchyFromSkinClump(RpClump *clump);
+RpHAnimHierarchy* GetAnimHierarchyFromClump(RpClump *clump);
+
+void DeleteRwObject_hook(RpClump *clump);
 
 struct RpSkin
 {
@@ -38,9 +44,6 @@ struct RpSkin
 	RwInt32 singleIndex;
 	void *data;
 };
-
-
-extern void **CModelInfo__ms_modelInfoPtrs;
 
 template<typename CT, typename DT> inline void*
 construct_array(void *mem, CT ctor, DT dtor, int sz, int nelem)
@@ -128,10 +131,37 @@ struct AnimBlendFrameData;
 class CAnimBlendClumpData;
 class CAnimManager;
 
-RpClump *__fastcall CClumpModelInfo__CreateInstance(int self);
-void __fastcall CClumpModelInfo__SetClump(int self, int, RpClump *clump);
-void __fastcall CPedModelInfo__SetClump(int self, int, RpClump *clump);
-void updateLimbs(RpClump *clump);
+struct CPedModelInfo;
+
+struct CModelInfo
+{
+	static CPedModelInfo *AddPedModel(int id);
+	static void **ms_modelInfoPtrs;
+};
+
+struct CClumpModelInfo : public CModelInfo
+{
+	void *vtable;
+	char     name[24];	// no idea what the size really is
+	RwUInt32 data1[5];
+	RpClump *clump;
+
+	RpClump *CreateInstance(void);
+	void SetClump(RpClump*);
+	void SetFrameIds(int ids);
+};
+
+struct CPedModelInfo : public CClumpModelInfo
+{
+	RwUInt32 data2[4];
+	void *hitColModel;
+	RpAtomic *head;
+	RpAtomic *lhand;
+	RpAtomic *rhand;
+	CPedModelInfo(void);
+	void SetClump(RpClump *clump);
+	void DeleteRwObject(void);
+};
 
 void FrameUpdateCallBack(AnimBlendFrameData *frame, void *arg);
 void FrameUpdateCallBackSkinned(AnimBlendFrameData *frame, void *arg);
@@ -158,9 +188,9 @@ CAnimBlendAssociation *RpAnimBlendClumpGetFirstAssociation(RpClump *clump, uint 
 CAnimBlendAssociation *RpAnimBlendGetNextAssociation(CAnimBlendAssociation *assoc);
 CAnimBlendAssociation *RpAnimBlendGetNextAssociation(CAnimBlendAssociation *assoc, uint mask);
 
-extern RpAtomic *atomicArray[20];
-extern int atomicArraySP;
-void atomicsToArray(RpClump *clump);
+//extern RpAtomic *atomicArray[20];
+//extern int atomicArraySP;
+//void atomicsToArray(RpClump *clump);
 
 struct RFrame {
 	CQuaternion rot;

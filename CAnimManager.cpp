@@ -201,7 +201,7 @@ CAnimManager::LoadAnimFiles(void)
 		sizeof(CAnimBlendAssocGroup), 25);
 
 	for(int i = 0; i < 25; i++){
-		void *model = CModelInfo__ms_modelInfoPtrs[CAnimManager::ms_aAnimAssocDefinitions[i].modelIndex];
+		void *model = CModelInfo::ms_modelInfoPtrs[CAnimManager::ms_aAnimAssocDefinitions[i].modelIndex];
 		// wtf?
 		//((void (__thiscall*)(void*)) (*(void***)model)[5])(model);	// no-op
 		// CClumpModelInfo::CreateInstance()

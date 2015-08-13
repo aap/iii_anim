@@ -15,12 +15,14 @@ WRAPPER RwMatrix *RwMatrixTransform(RwMatrix*, const RwMatrix*, RwOpCombineType)
 WRAPPER RwFrame *RwFrameForAllChildren(RwFrame*, RwFrameCallBack, void*) { EAXJMP(0x5A1FC0); }
 WRAPPER RwFrame *RwFrameUpdateObjects(RwFrame*) { EAXJMP(0x5A1C60); }
 WRAPPER RwFrame *RwFrameRemoveChild(RwFrame *) { EAXJMP(0x5A1ED0); }
+WRAPPER RwBool RwFrameDestroy(RwFrame*) { EAXJMP(0x5A1A30); }
 WRAPPER RwV3d *RwV3dTransformPoints(RwV3d*, const RwV3d*, RwInt32, const RwMatrix*) { EAXJMP(0x5A37D0); }
 WRAPPER RwBool RpClumpDestroy(RpClump*) { EAXJMP(0x59F500); }
 WRAPPER RpClump *RpClumpForAllAtomics(RpClump*, RpAtomicCallBack, void*) { EAXJMP(0x59EDD0); }
 WRAPPER RpClump *RpClumpClone(RpClump*) { EAXJMP(0x59F1B0); }
 WRAPPER RpClump *RpClumpRemoveAtomic(RpClump*, RpAtomic*) { EAXJMP(0x59F6B0); }
 WRAPPER RpClump *RpClumpAddAtomic(RpClump*, RpAtomic*) { EAXJMP(0x59F680); }
+WRAPPER RwBool RpAtomicDestroy(RpAtomic*) { EAXJMP(0x59F020); }
 WRAPPER RpSkin *RpSkinGeometryGetSkin(RpGeometry*) { EAXJMP(0x5B1080); }
 WRAPPER RpAtomic *RpSkinAtomicSetHAnimHierarchy(RpAtomic*, RpHAnimHierarchy*) { EAXJMP(0x5B1050); }
 WRAPPER RpHAnimHierarchy *RpSkinAtomicGetHAnimHierarchy(const RpAtomic*) { EAXJMP(0x5B1070); }
@@ -38,7 +40,7 @@ WRAPPER void CFileMgr::CloseFile(int) { EAXJMP(0x479200); }
 WRAPPER void CQuaternion::Slerp(CQuaternion&, CQuaternion&, float, float, float) { EAXJMP(0x4BA1C0); }
 WRAPPER void CQuaternion::Get(RwMatrix *mat) { EAXJMP(0x4BA0D0); }
 
-void **CModelInfo__ms_modelInfoPtrs = (void**)0x83D408;
+void **CModelInfo::ms_modelInfoPtrs = (void**)0x83D408;
 
 static char *charclasses = (char*)0x618370;
 static char *charset = (char*)0x618470;
@@ -92,6 +94,7 @@ IsClumpSkinned(RpClump *c)
 	return ret;
 }
 
+/*
 RpAtomic *atomicArray[20];
 int atomicArraySP = 0;
 
@@ -107,6 +110,7 @@ atomicsToArray(RpClump *clump)
 	atomicArraySP = 0;
 	RpClumpForAllAtomics(clump, atomicsToArrayCB, NULL);
 }
+*/
 
 void
 patch10(void)
@@ -219,9 +223,14 @@ patch10(void)
 	MemoryVP::InjectHook(0x405780, (CAnimBlendAssociation *(*)(CAnimBlendAssociation*))RpAnimBlendGetNextAssociation, PATCH_JUMP);
 	MemoryVP::InjectHook(0x4057A0, (CAnimBlendAssociation *(*)(CAnimBlendAssociation*, uint))RpAnimBlendGetNextAssociation, PATCH_JUMP);
 
-	MemoryVP::InjectHook(0x4F8920, CClumpModelInfo__CreateInstance, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4F8830, CClumpModelInfo__SetClump, PATCH_JUMP);
-	MemoryVP::InjectHook(0x510210, CPedModelInfo__SetClump, PATCH_JUMP);
+	MemoryVP::InjectHook(0x4F8920, &CClumpModelInfo::CreateInstance, PATCH_JUMP);
+	MemoryVP::InjectHook(0x4F8830, &CClumpModelInfo::SetClump, PATCH_JUMP);
+	MemoryVP::InjectHook(0x510210, &CPedModelInfo::SetClump, PATCH_JUMP);
+	MemoryVP::InjectHook(0x473FC6, &DeleteRwObject_hook);
+	MemoryVP::InjectHook(0x50BAD0, &CModelInfo::AddPedModel, PATCH_JUMP);
+	MemoryVP::Patch(0x5FE004, &CPedModelInfo::DeleteRwObject);
+
+	pedhooks();
 }
 
 BOOL WINAPI

@@ -7,7 +7,7 @@ WRAPPER int CVisibilityPlugins__GetFrameHierarchyId(RwFrame*) { EAXJMP(0x528D80)
 
 CAnimBlendClumpData *&gpAnimBlendClump = *(CAnimBlendClumpData**)0x621000;
 
-RpAtomic*
+static RpAtomic*
 GetAnimHierarchyCallback(RpAtomic *atomic, void *data)
 {
 	*(RpHAnimHierarchy**)data = RpSkinAtomicGetHAnimHierarchy(atomic);
@@ -20,6 +20,26 @@ GetAnimHierarchyFromSkinClump(RpClump *clump)
 	RpHAnimHierarchy *hier = NULL;
 	RpClumpForAllAtomics(clump, GetAnimHierarchyCallback, &hier);
 	return hier;
+}
+
+static RwFrame*
+GetAnimHierarchyFromClumpCB(RwFrame *frame, void *data)
+{
+	RpHAnimHierarchy *hier = RpHAnimFrameGetHierarchy(frame);
+	if(hier){
+		*(RpHAnimHierarchy**)data = hier;
+		return NULL;
+	}
+	RwFrameForAllChildren(frame, GetAnimHierarchyFromClumpCB, data);
+	return frame;
+}
+
+RpHAnimHierarchy*
+GetAnimHierarchyFromClump(RpClump *clump)
+{
+	RpHAnimHierarchy *retval = NULL;
+	RwFrameForAllChildren(RpClumpGetFrame(clump), GetAnimHierarchyFromClumpCB, &retval);
+	return retval;
 }
 
 void
@@ -52,11 +72,9 @@ RpAnimBlendClumpUpdateAnimations(RpClump *clump, float timeDelta, bool doRender)
 
 	if(IsClumpSkinned(clump)){
 		clumpData->ForAllFrames(FrameUpdateCallBackSkinned, nodes);
-//		atomicsToArray(clump);
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(clump);
 		RpHAnimHierarchyUpdateMatrices(hier);
-//		RpHAnimHierarchyUpdateMatrices(hier);
-		updateLimbs(clump);
+//		updateLimbs(clump);
 	}else
 		clumpData->ForAllFrames(FrameUpdateCallBack, nodes);
 

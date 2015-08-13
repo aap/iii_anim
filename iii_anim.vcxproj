@@ -90,11 +90,12 @@
     <ClCompile Include="CAnimBlendNode.cpp" />
     <ClCompile Include="CAnimBlendSequence.cpp" />
     <ClCompile Include="CAnimManager.cpp" />
+    <ClCompile Include="CPed.cpp" />
     <ClCompile Include="frameUpdate.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="RpAnimBlend.cpp" />
     <ClCompile Include="rw.cpp" />
-    <ClCompile Include="skin.cpp" />
+    <ClCompile Include="ModelInfo.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
