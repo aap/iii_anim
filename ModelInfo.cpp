@@ -95,7 +95,7 @@ CClumpModelInfo::SetClump(RpClump *clump)
 struct LimbCBarg {
 	CPedModelInfo *pedmodelinfo;
 	RpClump *clump;
-	RwInt32 id[3];
+	RpAtomic *atomics[3];
 };
 
 RpAtomic*
@@ -105,13 +105,13 @@ CPedModelInfo__findLimbsCb(RpAtomic *atomic, void *data)
 	RwFrame *frame = RpAtomicGetFrame(atomic);
 	const char *name = GetFrameNodeName(frame);
 	if(lcstrcmp(name, "Shead01") == 0){
-		limbs->id[0] = RpHAnimFrameGetID(frame);
+		limbs->atomics[0] = atomic;
 		limbs->pedmodelinfo->head = atomic;
 	}else if(lcstrcmp(name, "SLhand01") == 0){
-		limbs->id[1] = RpHAnimFrameGetID(frame);
+		limbs->atomics[1] = atomic;
 		limbs->pedmodelinfo->lhand = atomic;
 	}else if(lcstrcmp(name, "SRhand01") == 0){
-		limbs->id[2] = RpHAnimFrameGetID(frame);
+		limbs->atomics[2] = atomic;
 		limbs->pedmodelinfo->rhand = atomic;
 	}else
 		return atomic;
@@ -124,10 +124,13 @@ void
 CPedModelInfo::SetClump(RpClump *clump)
 {
 	int isplayer = strcmp(this->name, "player") == 0;
+	RpAtomic *atomic;
 	// set renderCB before removing Atomics from Clump
 	if(isplayer)
 		RpClumpForAllAtomics(clump, (RpAtomicCallBack)0x4F8940, (void*)0x528B30);	// CClumpModelInfo::SetAtomicRendererCB, CVisibilityPlugins::RenderPlayerCB
-	if(IsClumpSkinned(clump)){
+	if(atomic = IsClumpSkinned(clump)){
+		RpClumpRemoveAtomic(clump, atomic);
+		RpClumpAddAtomic(clump, atomic);
 		LimbCBarg limbs = { this, clump, 0, 0, 0 };
 		RpClumpForAllAtomics(clump, CPedModelInfo__findLimbsCb, &limbs);
 	}
@@ -146,18 +149,15 @@ CPedModelInfo::CPedModelInfo(void)
 	this->head = this->lhand = this->rhand = NULL;
 }
 
-static struct {
-	int numElements;
-	CPedModelInfo objects[90];
-} CModelInfo__ms_pedModelStore = { 0 };
+CStore_PedModelInfo CModelInfo::ms_pedModelStore = { 0 };
 
 CPedModelInfo*
 CModelInfo::AddPedModel(int id)
 {
-	if(CModelInfo__ms_pedModelStore.numElements >= 90)
+	if(CModelInfo::ms_pedModelStore.numElements >= 90)
 		printf("Size of this thing:%d needs increasing\n", 90);
 	CPedModelInfo *modelInfo;
-	modelInfo = &CModelInfo__ms_pedModelStore.objects[CModelInfo__ms_pedModelStore.numElements++];
+	modelInfo = &CModelInfo::ms_pedModelStore.objects[CModelInfo::ms_pedModelStore.numElements++];
 	modelInfo->clump = NULL;
 	CModelInfo::ms_modelInfoPtrs[id] = modelInfo;
 	return modelInfo;

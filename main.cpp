@@ -226,9 +226,14 @@ patch10(void)
 	MemoryVP::InjectHook(0x4F8920, &CClumpModelInfo::CreateInstance, PATCH_JUMP);
 	MemoryVP::InjectHook(0x4F8830, &CClumpModelInfo::SetClump, PATCH_JUMP);
 	MemoryVP::InjectHook(0x510210, &CPedModelInfo::SetClump, PATCH_JUMP);
-	MemoryVP::InjectHook(0x473FC6, &DeleteRwObject_hook);
+//	MemoryVP::InjectHook(0x473FC6, &DeleteRwObject_hook);
 	MemoryVP::InjectHook(0x50BAD0, &CModelInfo::AddPedModel, PATCH_JUMP);
 	MemoryVP::Patch(0x5FE004, &CPedModelInfo::DeleteRwObject);
+
+	MemoryVP::Patch(0x50B6EC, &CModelInfo::ms_pedModelStore);
+	MemoryVP::Patch(0x50B6F4, &CModelInfo::ms_pedModelStore);
+	MemoryVP::Patch(0x50B70B, &CModelInfo::ms_pedModelStore);
+	MemoryVP::Patch(0x50B708, (BYTE)sizeof(CPedModelInfo));
 
 	pedhooks();
 }

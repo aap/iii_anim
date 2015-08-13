@@ -131,15 +131,7 @@ struct AnimBlendFrameData;
 class CAnimBlendClumpData;
 class CAnimManager;
 
-struct CPedModelInfo;
-
-struct CModelInfo
-{
-	static CPedModelInfo *AddPedModel(int id);
-	static void **ms_modelInfoPtrs;
-};
-
-struct CClumpModelInfo : public CModelInfo
+struct CClumpModelInfo
 {
 	void *vtable;
 	char     name[24];	// no idea what the size really is
@@ -161,6 +153,19 @@ struct CPedModelInfo : public CClumpModelInfo
 	CPedModelInfo(void);
 	void SetClump(RpClump *clump);
 	void DeleteRwObject(void);
+};
+
+struct CStore_PedModelInfo {
+	int numElements;
+	CPedModelInfo objects[90];
+};
+
+struct CModelInfo
+{
+	static CPedModelInfo *AddPedModel(int id);
+	static void **ms_modelInfoPtrs;
+
+	static CStore_PedModelInfo ms_pedModelStore;
 };
 
 void FrameUpdateCallBack(AnimBlendFrameData *frame, void *arg);

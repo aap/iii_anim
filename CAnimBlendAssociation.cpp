@@ -54,10 +54,8 @@ CAnimBlendAssociation::Init(RpClump *clump, CAnimBlendHierarchy *anim)
 	CAnimBlendClumpData *clumpData = *RWPLUGINOFFSET(CAnimBlendClumpData*, clump, ClumpOffset);
 	this->numNodes = clumpData->numFrames;
 	this->AllocateAnimBlendNodeArray(this->numNodes);
-	for(int i = 0; i < this->numNodes; i++){
-		this->nodes[i].sequence = (CAnimBlendSequence*)0xbeefbeef;
+	for(int i = 0; i < this->numNodes; i++)
 		this->nodes[i].blendAssoc = this;
-	}
 	this->hierarchy = anim;
 	AnimBlendFrameData *frameData;
 	for(int i = 0; i < anim->numSequences; i++){
