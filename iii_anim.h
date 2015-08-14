@@ -131,9 +131,31 @@ struct AnimBlendFrameData;
 class CAnimBlendClumpData;
 class CAnimManager;
 
+struct CPed
+{
+	void **vtable;
+	int data1[18];
+	RpClump *clump;
+	int data2[3];
+	short modelID;
+	short pad;
+	int data3[81];
+	AnimBlendFrameData *frames[12];
+	int animGroup;
+	int unk1;
+	float position[3];
+	int data4[182];
+	int weaponModelId;
+	int data5[31];
+
+	void renderLimb(int node);
+	void AddWeaponModel(int id);
+	void RemoveWeaponModel(int i);
+};
+
 struct CClumpModelInfo
 {
-	void *vtable;
+	void **vtable;
 	char     name[24];	// no idea what the size really is
 	RwUInt32 data1[5];
 	RpClump *clump;
@@ -145,7 +167,10 @@ struct CClumpModelInfo
 
 struct CPedModelInfo : public CClumpModelInfo
 {
-	RwUInt32 data2[4];
+	int animGroup;
+	int unk1;
+	int pedStats;
+	int unk2;
 	void *hitColModel;
 	RpAtomic *head;
 	RpAtomic *lhand;

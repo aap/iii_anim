@@ -13,6 +13,7 @@ WRAPPER RwMatrix *RwMatrixUpdate(RwMatrix*) { EAXJMP(0x5A28E0); }
 WRAPPER RwMatrix *RwMatrixInvert(RwMatrix*, const RwMatrix*) { EAXJMP(0x5A2C90); }
 WRAPPER RwMatrix *RwMatrixTransform(RwMatrix*, const RwMatrix*, RwOpCombineType) { EAXJMP(0x5A2EE0); }
 WRAPPER RwFrame *RwFrameForAllChildren(RwFrame*, RwFrameCallBack, void*) { EAXJMP(0x5A1FC0); }
+WRAPPER RwFrame *RwFrameForAllObjects(RwFrame*, RwObjectCallBack, void*) { EAXJMP(0x5A2340); }
 WRAPPER RwFrame *RwFrameUpdateObjects(RwFrame*) { EAXJMP(0x5A1C60); }
 WRAPPER RwFrame *RwFrameRemoveChild(RwFrame *) { EAXJMP(0x5A1ED0); }
 WRAPPER RwBool RwFrameDestroy(RwFrame*) { EAXJMP(0x5A1A30); }
@@ -23,6 +24,7 @@ WRAPPER RpClump *RpClumpClone(RpClump*) { EAXJMP(0x59F1B0); }
 WRAPPER RpClump *RpClumpRemoveAtomic(RpClump*, RpAtomic*) { EAXJMP(0x59F6B0); }
 WRAPPER RpClump *RpClumpAddAtomic(RpClump*, RpAtomic*) { EAXJMP(0x59F680); }
 WRAPPER RwBool RpAtomicDestroy(RpAtomic*) { EAXJMP(0x59F020); }
+WRAPPER RpAtomic *RpAtomicSetFrame(RpAtomic*, RwFrame*) { EAXJMP(0x5A0600); }
 WRAPPER RpSkin *RpSkinGeometryGetSkin(RpGeometry*) { EAXJMP(0x5B1080); }
 WRAPPER RpAtomic *RpSkinAtomicSetHAnimHierarchy(RpAtomic*, RpHAnimHierarchy*) { EAXJMP(0x5B1050); }
 WRAPPER RpHAnimHierarchy *RpSkinAtomicGetHAnimHierarchy(const RpAtomic*) { EAXJMP(0x5B1070); }
@@ -226,10 +228,11 @@ patch10(void)
 	MemoryVP::InjectHook(0x4F8920, &CClumpModelInfo::CreateInstance, PATCH_JUMP);
 	MemoryVP::InjectHook(0x4F8830, &CClumpModelInfo::SetClump, PATCH_JUMP);
 	MemoryVP::InjectHook(0x510210, &CPedModelInfo::SetClump, PATCH_JUMP);
-//	MemoryVP::InjectHook(0x473FC6, &DeleteRwObject_hook);
+	MemoryVP::InjectHook(0x473FC6, &DeleteRwObject_hook);
 	MemoryVP::InjectHook(0x50BAD0, &CModelInfo::AddPedModel, PATCH_JUMP);
 	MemoryVP::Patch(0x5FE004, &CPedModelInfo::DeleteRwObject);
 
+	// patch CModelInfo::ShutDown() instead of rewriting that weird code
 	MemoryVP::Patch(0x50B6EC, &CModelInfo::ms_pedModelStore);
 	MemoryVP::Patch(0x50B6F4, &CModelInfo::ms_pedModelStore);
 	MemoryVP::Patch(0x50B70B, &CModelInfo::ms_pedModelStore);
