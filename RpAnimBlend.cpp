@@ -74,7 +74,6 @@ RpAnimBlendClumpUpdateAnimations(RpClump *clump, float timeDelta, bool doRender)
 		clumpData->ForAllFrames(FrameUpdateCallBackSkinned, nodes);
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(clump);
 		RpHAnimHierarchyUpdateMatrices(hier);
-//		updateLimbs(clump);
 	}else
 		clumpData->ForAllFrames(FrameUpdateCallBack, nodes);
 

@@ -91,6 +91,7 @@
     <ClCompile Include="CAnimBlendSequence.cpp" />
     <ClCompile Include="CAnimManager.cpp" />
     <ClCompile Include="CPed.cpp" />
+    <ClCompile Include="CPedIK.cpp" />
     <ClCompile Include="frameUpdate.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="RpAnimBlend.cpp" />

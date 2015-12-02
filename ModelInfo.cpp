@@ -62,7 +62,7 @@ CClumpModelInfo::SetClump(RpClump *clump)
 	CVisibilityPlugins__SetClumpModelInfo(clump, (int)this);
 	CBaseModelInfo__AddTexDictionaryRef((int)this);
 	RpClumpForAllAtomics(clump, (RpAtomicCallBack)0x4F8940, 0);	// CClumpModelInfo::SetAtomicRendererCB
-	// Xbox does something depending on *(this+42) here
+	// Xbox sets world pipeline depending on *(this+42) here
 	if(strcmp(this->name, "playerh") == 0)
 		RpClumpForAllAtomics(clump, (RpAtomicCallBack)0x4F8940, (void*)0x528B30);	// CClumpModelInfo::SetAtomicRendererCB, CVisibilityPlugins::RenderPlayerCB
 
@@ -89,8 +89,6 @@ CClumpModelInfo::SetClump(RpClump *clump)
 		RpHAnimHierarchySetFlags(hier, rpHANIMHIERARCHYUPDATEMODELLINGMATRICES|rpHANIMHIERARCHYUPDATELTMS);
 	}
 }
-
-//RpAtomic *limbAtomics[3];
 
 struct LimbCBarg {
 	CPedModelInfo *pedmodelinfo;

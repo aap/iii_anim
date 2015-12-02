@@ -1,6 +1,13 @@
 #include "iii_anim.h"
 
-WRAPPER void __fastcall CEntity__Render(void *self) { EAXJMP(0x474BD0); }
+WRAPPER void CEntity::Render(void) { EAXJMP(0x474BD0); }
+
+void
+CEntity::UpdateRpHAnim(void)
+{
+	RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(this->clump);
+	RpHAnimHierarchyUpdateMatrices(hier);
+}
 
 int &CPools__ms_pPedPool = *(int*)0x8F2C60;
 WRAPPER int __fastcall CPool_CPed_CPlayerPed_GetIndex(int self, int, CPed *ped) { EAXJMP(0x43EB70); }
@@ -39,7 +46,7 @@ CPed::renderLimb(int node)
 void __fastcall
 cped__render__hook(CPed* ped)
 {
-	CEntity__Render(ped);
+	ped->CEntity::Render();
 	if(IsClumpSkinned(ped->clump)){
 		ped->renderLimb(2);
 		ped->renderLimb(5);
@@ -94,6 +101,36 @@ CPed::RemoveWeaponModel(int id)
 	}
 }
 
+void __declspec(naked)
+cped_prerender_hook1(void)
+{
+	_asm{
+		add	esp, 0x1C
+		mov	ecx, [esp+0xC]
+		push	dword ptr [ecx+4Ch]
+		call	IsClumpSkinned
+		add	esp, 4
+		test	eax, eax
+		je	x
+		mov	ecx, [esp+0xC]
+		call	CEntity::UpdateRpHAnim
+	x:	mov	eax, [esp+0xC]
+		push	dword ptr 0x4CFE1E
+		retn
+	}
+}
+
+void __declspec(naked)
+cped_prerender_hook2(void)
+{
+	_asm{
+		mov	[esp+0x30], 0
+		int 3
+		push	dword ptr 0x4CFE9A
+		retn
+	}
+}
+
 void
 pedhooks(void)
 {
@@ -101,4 +138,7 @@ pedhooks(void)
 	MemoryVP::InjectHook(0x4CF8F0, &CPed::AddWeaponModel, PATCH_JUMP);
 	MemoryVP::InjectHook(0x4CF980, &CPed::RemoveWeaponModel, PATCH_JUMP);
 	MemoryVP::InjectHook(0x4D0484, cped__render__hook);
+
+	MemoryVP::InjectHook(0x4CFE17, cped_prerender_hook1, PATCH_JUMP);
+	MemoryVP::InjectHook(0x4CFE92, cped_prerender_hook2, PATCH_JUMP);
 }

@@ -12,6 +12,9 @@ WRAPPER void *gta_nw(int) { EAXJMP(0x5A0690); }
 WRAPPER RwMatrix *RwMatrixUpdate(RwMatrix*) { EAXJMP(0x5A28E0); }
 WRAPPER RwMatrix *RwMatrixInvert(RwMatrix*, const RwMatrix*) { EAXJMP(0x5A2C90); }
 WRAPPER RwMatrix *RwMatrixTransform(RwMatrix*, const RwMatrix*, RwOpCombineType) { EAXJMP(0x5A2EE0); }
+WRAPPER RwMatrix *RwMatrixRotate(RwMatrix*, const RwV3d*, RwReal, RwOpCombineType) { EAXJMP(0x5A2BF0); }
+WRAPPER RwMatrix *RwMatrixCreate(void) { EAXJMP(0x5A3330); }
+WRAPPER RwBool RwMatrixDestroy(RwMatrix*) { EAXJMP(0x5A3300); }
 WRAPPER RwFrame *RwFrameForAllChildren(RwFrame*, RwFrameCallBack, void*) { EAXJMP(0x5A1FC0); }
 WRAPPER RwFrame *RwFrameForAllObjects(RwFrame*, RwObjectCallBack, void*) { EAXJMP(0x5A2340); }
 WRAPPER RwFrame *RwFrameUpdateObjects(RwFrame*) { EAXJMP(0x5A1C60); }
@@ -41,6 +44,13 @@ WRAPPER void CFileMgr::Seek(int, int, int) { EAXJMP(0x479180); }
 WRAPPER void CFileMgr::CloseFile(int) { EAXJMP(0x479200); }
 WRAPPER void CQuaternion::Slerp(CQuaternion&, CQuaternion&, float, float, float) { EAXJMP(0x4BA1C0); }
 WRAPPER void CQuaternion::Get(RwMatrix *mat) { EAXJMP(0x4BA0D0); }
+WRAPPER void CMatrix::ctor(RwMatrix *, bool) { EAXJMP(0x4B8D90); }
+WRAPPER void CMatrix::dtor(void) { EAXJMP(0x4B8DB0); }
+WRAPPER void CMatrix::RotateX(float) { EAXJMP(0x4B9510); }
+WRAPPER void CMatrix::SetRotateZ(float) { EAXJMP(0x4B9370); }
+WRAPPER void CMatrix::UpdateRW(void) { EAXJMP(0x4B8EC0); }
+WRAPPER void CVector::Normalize(void) { EAXJMP(0x4BA560); };
+WRAPPER void CrossProduct(CVector *, CVector *, CVector *) { EAXJMP(0x4BA350); }
 
 void **CModelInfo::ms_modelInfoPtrs = (void**)0x83D408;
 
@@ -238,6 +248,7 @@ patch10(void)
 	MemoryVP::Patch(0x50B70B, &CModelInfo::ms_pedModelStore);
 	MemoryVP::Patch(0x50B708, (BYTE)sizeof(CPedModelInfo));
 
+	pedikhooks();
 	pedhooks();
 }
 

@@ -16,6 +16,7 @@
 typedef unsigned int uint;
 
 void pedhooks(void);
+void pedikhooks(void);
 
 #define RwEngineInstance (*rwengine)
 extern void **rwengine;
@@ -84,6 +85,19 @@ public:
 	static void CloseFile(int fd);
 };
 
+struct CMatrix
+{
+	RwMatrix matrix;
+	RwMatrix *pMatrix;
+	int haveRwMatrix;
+
+	void ctor(RwMatrix *, bool);
+	void dtor(void);
+	void RotateX(float);
+	void SetRotateZ(float);
+	void UpdateRW(void);
+};
+
 class CQuaternion {
 public:
 	float x, y, z, w;
@@ -119,7 +133,10 @@ public:
 		this->y += v.y;
 		this->z += v.z;
 	};
+	void Normalize(void);
 };
+
+void CrossProduct(CVector *, CVector *, CVector *);
 
 class CAnimBlendSequence;
 class CAnimBlendHierarchy;
@@ -131,7 +148,7 @@ struct AnimBlendFrameData;
 class CAnimBlendClumpData;
 class CAnimManager;
 
-struct CPed
+struct CEntity
 {
 	void **vtable;
 	int data1[18];
@@ -139,18 +156,55 @@ struct CPed
 	int data2[3];
 	short modelID;
 	short pad;
-	int data3[81];
+	int data3;
+
+	void Render(void);
+	void UpdateRpHAnim(void);
+};
+
+struct CPed : public CEntity
+{
+	int data1[80];
 	AnimBlendFrameData *frames[12];
 	int animGroup;
 	int unk1;
 	float position[3];
-	int data4[182];
+	int data4[61];
+	float someAngle;
+	int data5[120];
 	int weaponModelId;
-	int data5[31];
+	int data6[31];
 
 	void renderLimb(int node);
 	void AddWeaponModel(int id);
 	void RemoveWeaponModel(int i);
+};
+
+struct CPedIK
+{
+	struct LimbOrientation
+	{
+		float phi;
+		float theta;
+	};
+
+	CPed *ped;
+	LimbOrientation headOrient;
+	LimbOrientation torsoOrient;
+	int unk[5];
+
+	static float *ms_headInfo;
+	static float *ms_torsoInfo;
+	static float *ms_headRestoreInfo;
+
+	void GetComponentPosition(RwV3d *pos, int id);
+	int LookInDirection(float phi, float theta);
+	void RotateTorso(AnimBlendFrameData*, LimbOrientation*, bool);
+	bool RestoreLookAt(void);
+	static void __stdcall ExtractYawAndPitchLocal(RwMatrixTag *, float *, float *);
+	static void __stdcall ExtractYawAndPitchWorld(RwMatrixTag *, float *, float *);
+	static RwMatrix *GetWorldMatrix(RwFrame *, RwMatrixTag *);
+	static int __stdcall MoveLimb(LimbOrientation *, float, float, float * /* LimbMovementInfo* */);
 };
 
 struct CClumpModelInfo
