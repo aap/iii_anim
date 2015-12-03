@@ -164,7 +164,9 @@ struct CEntity
 
 struct CPed : public CEntity
 {
-	int data1[80];
+	int data2[62];
+	int someFlags;
+	int data3[17];
 	AnimBlendFrameData *frames[12];
 	int animGroup;
 	int unk1;
@@ -191,17 +193,25 @@ struct CPedIK
 	CPed *ped;
 	LimbOrientation headOrient;
 	LimbOrientation torsoOrient;
-	int unk[5];
+	LimbOrientation upperArmOrient;
+	LimbOrientation lowerArmOrient;
+	int flags;
 
 	static float *ms_headInfo;
 	static float *ms_torsoInfo;
 	static float *ms_headRestoreInfo;
+	static float *ms_upperArmInfo;
+	static float *ms_lowerArmInfo;
 
 	void GetComponentPosition(RwV3d *pos, int id);
 	int LookInDirection(float phi, float theta);
 	void RotateTorso(AnimBlendFrameData*, LimbOrientation*, bool);
 	bool RestoreLookAt(void);
+	bool PointGunInDirection(float, float);
+	bool PointGunInDirectionUsingArm(float, float);
+	void RotateHead(void);
 	static void __stdcall ExtractYawAndPitchLocal(RwMatrixTag *, float *, float *);
+	static void ExtractYawAndPitchLocalSkinned(AnimBlendFrameData *, float *, float *);
 	static void __stdcall ExtractYawAndPitchWorld(RwMatrixTag *, float *, float *);
 	static RwMatrix *GetWorldMatrix(RwFrame *, RwMatrixTag *);
 	static int __stdcall MoveLimb(LimbOrientation *, float, float, float * /* LimbMovementInfo* */);

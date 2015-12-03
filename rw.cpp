@@ -86,3 +86,53 @@ RpSkinGetNumBones(RpSkin *skin)
 {
 	return skin->numBones;
 }
+
+//RwReal
+//RwV3dLength(const RwV3d *in)
+//{
+//	return sqrt(in->x*in->x + in->y*in->y + in->z*in->z);
+//}
+
+RwReal
+RwV3dNormalize(RwV3d *out, const RwV3d *in)
+{
+	float len = in->x*in->x + in->y*in->y + in->z*in->z;
+	if(len == 0.0f)
+		return len;
+	float r = 1/sqrt(len);
+	RwV3dScale(out, in, r);
+	return len;
+}
+
+RtQuat*
+QuatRotate(RtQuat *out, const RwV3d *axis, float angle)
+{
+	angle *= M_PI_2/180.0f;
+	out->real = cos(angle);
+	RwV3dNormalize(&out->imag, axis);
+	RwV3dScale(&out->imag, &out->imag, sin(angle));
+	return out;
+}
+
+RtQuat*
+RtQuatRotate(RtQuat *quat, const RwV3d *axis, RwReal angle, RwOpCombineType combineOp)
+{
+	RtQuat p, q;
+	if(quat && axis){
+		if(combineOp == rwCOMBINEREPLACE)
+			return QuatRotate(quat, axis, angle);
+		else if(combineOp == rwCOMBINEPRECONCAT){
+			RtQuatAssign(&p, quat);
+			QuatRotate(&q, axis, angle);
+			RtQuatMultiply(quat, &p, &q);
+			return quat;
+		}else if(combineOp == rwCOMBINEPOSTCONCAT){
+			RtQuatAssign(&p, quat);
+			QuatRotate(&q, axis, angle);
+			RtQuatMultiply(quat, &q, &p);
+			return quat;
+		}
+		return NULL;
+	}
+	return NULL;
+}
