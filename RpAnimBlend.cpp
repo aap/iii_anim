@@ -72,8 +72,6 @@ RpAnimBlendClumpUpdateAnimations(RpClump *clump, float timeDelta, bool doRender)
 
 	if(IsClumpSkinned(clump)){
 		clumpData->ForAllFrames(FrameUpdateCallBackSkinned, nodes);
-		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(clump);
-		RpHAnimHierarchyUpdateMatrices(hier);
 	}else
 		clumpData->ForAllFrames(FrameUpdateCallBack, nodes);
 
@@ -272,7 +270,7 @@ RpAnimBlendClumpInitSkinned(RpClump *clump)
 	SkinGetBonePositionsToTable(clump, boneTab);
 
 	AnimBlendFrameData *frames = clumpData->frames;
-	for(int i = 0; i < numBones; i++){
+	for(uint i = 0; i < numBones; i++){
 		frames[i].nodeID = hier->pNodeInfo[i].nodeID;
 		frames[i].pos = boneTab[i];
 		frames[i].hanimframe = (RpHAnimStdKeyFrame*)rpHANIMHIERARCHYGETINTERPFRAME(hier, i);

@@ -125,6 +125,20 @@ atomicsToArray(RpClump *clump)
 */
 
 void
+dumpAnimGroups(void)
+{
+	FILE *f;
+	f = fopen("animgrp_iii.txt", "wb");
+	for(int i = 0; i < 25; i++){
+		AnimAssocDefinition *def = &CAnimManager::ms_aAnimAssocDefinitions[i];
+		fprintf(f, "%s %s %d %d\n", def->name, def->blockName, def->modelIndex, def->animCount);
+		for(int j = 0; j < def->animCount; j++)
+			fprintf(f, "\t%d %s %x\n", def->animInfoList[j].animId, def->animNames[j], def->animInfoList[j].flags);
+	}
+	fclose(f);
+}
+
+void
 patch10(void)
 {
 /*
@@ -250,6 +264,26 @@ patch10(void)
 
 	pedikhooks();
 	pedhooks();
+
+	//dumpAnimGroups();
+
+	// TODO:
+	//	CCutsceneHead::CCutsceneHead
+	//	CCutsceneHead::ProcessControl
+	//	CCutsceneHead::Render
+	//	CCutsceneObject::ProcessControl
+	//	CCutsceneObject::Render
+	//	 CCutsceneObject::RenderLimb
+	//	-CCopPed::CopAI
+	//	 -CPedModelInfo::CreateHitColModelSkinned
+	//	 -CPedModelInfo::AnimatePedColModelSkinned
+	//	-CPed::SetModelIndex
+	//	-CPed::StartFightDefend
+	//	-CPed::FightStrike
+	//	-CWorld::ProcessLineOfSightSectorList
+	// unknown: sub_14C8AA
+	// xbox only: script 756
+	// mobile only: CCutsceneHead::RenderLimb
 }
 
 BOOL WINAPI

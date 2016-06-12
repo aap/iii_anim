@@ -8,7 +8,7 @@ void
 CAnimBlendClumpData::ctor(void)
 {
 	this->numFrames = 0;
-	this->d = 0;
+	this->pedPosition = NULL;
 	this->frames = NULL;
 	this->nextAssoc = NULL;
 	this->prevAssoc = NULL;

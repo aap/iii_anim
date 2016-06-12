@@ -3,7 +3,7 @@
 WRAPPER void CVisibilityPlugins__SetClumpModelInfo(RpClump *clump, int clumpModelInfo) { EAXJMP(0x528ED0); }
 WRAPPER void __fastcall CBaseModelInfo__AddTexDictionaryRef(int self) { EAXJMP(0x4F6B80); }
 WRAPPER void CClumpModelInfo::SetFrameIds(int ids) { EAXJMP(0x4F8BB0); }
-WRAPPER void __fastcall CPedModelInfo__CreateHitColModel(int self) { EAXJMP(0x5104D0); }
+//WRAPPER void __fastcall CPedModelInfo__CreateHitColModel(int self) { EAXJMP(0x5104D0); }
 WRAPPER void __fastcall CPedModelInfo__DeleteRwObject_orig(CPedModelInfo*) { EAXJMP(0x510280); }
 
 static RpAtomic*
@@ -34,14 +34,15 @@ HAnimAnimationCreateForHierarchy(RpHAnimHierarchy *hier)
 RpClump*
 CClumpModelInfo::CreateInstance(void)
 {
+	RpClump *clone, *clone2;
 	RpClump *clump = this->clump;
 	if(clump == NULL)
 		return NULL;
 
-	RpClump *clone2 = RpClumpClone(clump);
-	RpClump *clone = RpClumpClone(clone2);	// to reverse order of... something again...
+	clone2 = RpClumpClone(clump);
+	clone = RpClumpClone(clone2);	// to reverse order of... something again...
 	RpClumpDestroy(clone2);
-//	clone = clone2;
+	//clone = clone2;
 
 //	RpClump *clone = RpClumpClone(clump);
 	if(IsClumpSkinned(clone)){
@@ -50,7 +51,11 @@ CClumpModelInfo::CreateInstance(void)
 		RpHAnimAnimation *anim = HAnimAnimationCreateForHierarchy(hier);
 		RpHAnimHierarchySetCurrentAnim(hier, anim);
 		RpHAnimHierarchySetFlags(hier, rpHANIMHIERARCHYUPDATEMODELLINGMATRICES|rpHANIMHIERARCHYUPDATELTMS);
-		// Xbox has more some more code (skin related)
+/*	xbox:
+		v6 = RpSkinGeometryGetSkin(v5->geometry);
+		RpSkinGetNumBones(v6);
+		RpHAnimHierarchyUpdateMatrices(v3);
+*/
 	}
 	return clone;	
 }
@@ -69,11 +74,11 @@ CClumpModelInfo::SetClump(RpClump *clump)
 	if(IsClumpSkinned(clump)){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromClump(clump);
 		// mobile
-		RpClumpForAllAtomics(clump, SetHierarchyForSkinAtomic, hier);
-		RpAtomic *atomic = GetFirstAtomic(clump);
+		// RpClumpForAllAtomics(clump, SetHierarchyForSkinAtomic, hier);
+		// RpAtomic *atomic = GetFirstAtomic(clump);
 		// Xbox
-//		RpAtomic *atomic = IsClumpSkinned(clump);
-//		RpSkinAtomicSetHAnimHierarchy(atomic, hier);
+		RpAtomic *atomic = IsClumpSkinned(clump);
+		RpSkinAtomicSetHAnimHierarchy(atomic, hier);
 
 		RpSkin *skin = RpSkinGeometryGetSkin(atomic->geometry);
 		// ignore const, lol
@@ -127,15 +132,14 @@ CPedModelInfo::SetClump(RpClump *clump)
 	if(isplayer)
 		RpClumpForAllAtomics(clump, (RpAtomicCallBack)0x4F8940, (void*)0x528B30);	// CClumpModelInfo::SetAtomicRendererCB, CVisibilityPlugins::RenderPlayerCB
 	if(atomic = IsClumpSkinned(clump)){
-		RpClumpRemoveAtomic(clump, atomic);
-		RpClumpAddAtomic(clump, atomic);
 		LimbCBarg limbs = { this, clump, 0, 0, 0 };
 		RpClumpForAllAtomics(clump, CPedModelInfo__findLimbsCb, &limbs);
 	}
 	this->CClumpModelInfo::SetClump(clump);
 	this->SetFrameIds(0x5FE7A4);	// CPedModelInfo::m_pPedIds
 	if(this->hitColModel == NULL && !IsClumpSkinned(clump))
-		CPedModelInfo__CreateHitColModel((int)this);
+		this->CreateHitColModel();
+		//CPedModelInfo__CreateHitColModel((int)this);
 	// again, because CClumpModelInfo::SetClump resets renderCB
 	if(isplayer)
 		RpClumpForAllAtomics(clump, (RpAtomicCallBack)0x4F8940, (void*)0x528B30);	// CClumpModelInfo::SetAtomicRendererCB, CVisibilityPlugins::RenderPlayerCB
@@ -198,4 +202,143 @@ DeleteRwObject_hook(RpClump *clump)
 {
 	RpClumpForAllAtomics(clump, AtomicRemoveAnimFromSkinCB, NULL);
 	RpClumpDestroy(clump);
+}
+
+struct ColLimb
+{
+	char *name;
+	int id;
+	int flag;
+	float x;
+	float z;
+	float radius;
+};
+
+ColLimb *ColLimbs = (ColLimb*)0x5FE848;
+
+CColModel*
+CPedModelInfo::AnimatePedColModelSkinned(RpClump *clump)
+{
+	CColModel *colmodel = this->hitColModel;
+	if(colmodel == NULL){
+		this->CreateHitColModelSkinned(clump);
+		return this->hitColModel;
+	}
+	RwMatrix *m1, *m2;
+	CColSphere *spheres = colmodel->spheres;
+	RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(clump);
+	m1 = RwMatrixCreate();
+	m2 = RwMatrixCreate();
+	RwMatrixInvert(m1, &RpClumpGetFrame(clump)->modelling);
+	for(int i = 0; i < 8; i++){
+		*m2 = *m1;
+		int id = ConvertPedNode2BoneTag(ColLimbs[i].id);
+		int idx = RpHAnimIDGetIndex(hier, id);
+		RwMatrixTransform(m2, &RpHAnimHierarchyGetMatrixArray(hier)[idx], rwCOMBINEPRECONCAT);
+		RwV3d pos;
+		pos.x = pos.y = pos.z = 0.0f;
+		RwV3dTransformPoints(&pos, &pos, 1, m2);
+		spheres[i].center.x = pos.x + ColLimbs[i].x;
+		spheres[i].center.y = pos.y + 0.0f;
+		spheres[i].center.z = pos.z + ColLimbs[i].z;
+	}
+	RwMatrixDestroy(m1);
+	RwMatrixDestroy(m2);
+	return colmodel;
+}
+
+void
+CPedModelInfo::CreateHitColModelSkinned(RpClump *clump)
+{
+	CVector center;
+	RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(clump);
+	CColModel *colmodel = (CColModel*)gta_nw(0x58);
+	colmodel->ctor();
+	CColSphere *spheres = (CColSphere*)RwMalloc(8*sizeof(CColSphere));
+	RwMatrix *m1, *m2;
+	m1 = RwMatrixCreate();
+	m2 = RwMatrixCreate();
+	RwMatrixInvert(m1, &RpClumpGetFrame(clump)->modelling);
+	for(int i = 0; i < 8; i++){
+		*m2 = *m1;
+		int id = ConvertPedNode2BoneTag(ColLimbs[i].id);
+		int idx = RpHAnimIDGetIndex(hier, id);
+		RwMatrixTransform(m2, &RpHAnimHierarchyGetMatrixArray(hier)[idx], rwCOMBINEPRECONCAT);
+		RwV3d pos;
+		pos.x = pos.y = pos.z = 0.0f;
+		RwV3dTransformPoints(&pos, &pos, 1, m2);
+		center.x = pos.x + ColLimbs[i].x;
+		center.y = pos.y + 0.0f;
+		center.z = pos.z + ColLimbs[i].z;
+		spheres[i].Set(ColLimbs[i].radius, &center, 17, ColLimbs[i].flag);
+	}
+	RwMatrixDestroy(m1);
+	RwMatrixDestroy(m2);
+	colmodel->spheres = spheres;
+	colmodel->numSpheres = 8;
+	center.x = center.y = center.z = 0.0f;
+	colmodel->boundingSphere.Set(2.0f, &center, 0, 0);
+	CVector min, max;
+	min.x = min.y = -0.5f;
+	min.z = -1.2f;
+	max.x = max.y = 0.5f;
+	max.z = 1.2f;
+	colmodel->boundingBox.Set(&min, &max, 0, 0);
+	colmodel->level = 0;
+	this->hitColModel = colmodel;
+}
+
+void
+CPedModelInfo::CreateHitColModel(void)
+{
+	struct {
+		union {
+			char *name;
+			int id;
+		};
+		RwFrame *out;
+	} search;
+	CVector center;
+	CColModel *colmodel = (CColModel*)gta_nw(0x58);
+	colmodel->ctor();
+	CColSphere *spheres = (CColSphere*)RwMalloc(8*sizeof(CColSphere));
+	RwFrame *root = RpClumpGetFrame(this->clump);
+	RwMatrix *mat = RwMatrixCreate();
+	for(int i = 0; i < 8; i++){
+		if(ColLimbs[i].name){
+			search.name = ColLimbs[i].name;
+			search.out = NULL;
+			RwFrameForAllChildren(root, (RwFrameCallBack)0x4F8960, &search);
+		}else{
+			search.id = ColLimbs[i].id;
+			search.out = NULL;
+			RwFrameForAllChildren(root, (RwFrameCallBack)0x4F8AD0, &search);
+		}
+		RwFrame *f = search.out;
+		if(f){
+			float radius = ColLimbs[i].radius;
+			if(ColLimbs[i].id == 6)
+				RwFrameForAllObjects(root, (RwObjectCallBack)0x5104A0, &radius);
+			*mat = f->modelling;
+			for(f = RwFrameGetParent(f); f != root; f = RwFrameGetParent(f))
+				RwMatrixTransform(mat, &f->modelling, rwCOMBINEPOSTCONCAT);
+			center.x = mat->pos.x + ColLimbs[i].x;
+			center.y = mat->pos.y + 0.0f;
+			center.z = mat->pos.z + ColLimbs[i].z;
+			spheres[i].Set(radius, &center, 17, ColLimbs[i].flag);
+		}
+	}
+	RwMatrixDestroy(mat);
+	colmodel->spheres = spheres;
+	colmodel->numSpheres = 8;
+	center.x = center.y = center.z = 0.0f;
+	colmodel->boundingSphere.Set(2.0f, &center, 0, 0);
+	CVector min, max;
+	min.x = min.y = -0.5f;
+	min.z = -1.2f;
+	max.x = max.y = 0.5f;
+	max.z = 1.2f;
+	colmodel->boundingBox.Set(&min, &max, 0, 0);
+	colmodel->level = 0;
+	this->hitColModel = colmodel;
 }

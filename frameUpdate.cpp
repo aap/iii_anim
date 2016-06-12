@@ -76,13 +76,13 @@ FrameUpdateCallBackWith3dVelocityExtraction(AnimBlendFrameData *frame, CAnimBlen
 	}
 
 	if(!(frame->flag & 4)){
-		gpAnimBlendClump->d[0] = x - curx;
-		gpAnimBlendClump->d[1] = y - cury;
-		gpAnimBlendClump->d[2] = z - curz;
+		gpAnimBlendClump->pedPosition->x = x - curx;
+		gpAnimBlendClump->pedPosition->y = y - cury;
+		gpAnimBlendClump->pedPosition->z = z - curz;
 		if(looped){
-			gpAnimBlendClump->d[0] += endx;
-			gpAnimBlendClump->d[1] += endy;
-			gpAnimBlendClump->d[2] += endz;
+			gpAnimBlendClump->pedPosition->x += endx;
+			gpAnimBlendClump->pedPosition->y += endy;
+			gpAnimBlendClump->pedPosition->z += endz;
 		}
 		mat->pos.x = pos.x - x + frame->pos.x;
 		mat->pos.y = pos.y - y + frame->pos.y;
@@ -158,11 +158,11 @@ FrameUpdateCallBackWithVelocityExtraction(AnimBlendFrameData *frame, CAnimBlendN
 	}
 
 	if(!(frame->flag & 4)){
-		gpAnimBlendClump->d[0] = x - curx;
-		gpAnimBlendClump->d[1] = y - cury;
+		gpAnimBlendClump->pedPosition->x = x - curx;
+		gpAnimBlendClump->pedPosition->y = y - cury;
 		if(looped){
-			gpAnimBlendClump->d[0] += endx;
-			gpAnimBlendClump->d[1] += endy;
+			gpAnimBlendClump->pedPosition->x += endx;
+			gpAnimBlendClump->pedPosition->y += endy;
 		}
 		mat->pos.x = pos.x - x;
 		mat->pos.y = pos.y - y;
@@ -190,7 +190,7 @@ FrameUpdateCallBack(AnimBlendFrameData *frame, void *arg)
 	CAnimBlendNode **node;
 	RwMatrix *mat = &frame->frame->modelling;
 
-	if (frame->flag & 8 && gpAnimBlendClump->d){
+	if (frame->flag & 8 && gpAnimBlendClump->pedPosition){
 		if(frame->flag & 0x10)
 			FrameUpdateCallBackWith3dVelocityExtraction(frame, nodes);
 		else
@@ -313,13 +313,13 @@ FrameUpdateCallBackSkinnedWith3dVelocityExtraction(AnimBlendFrameData *frame, CA
 	}
 
 	if(!(frame->flag & 4)){
-		gpAnimBlendClump->d[0] = x - curx;
-		gpAnimBlendClump->d[1] = y - cury;
-		gpAnimBlendClump->d[2] = z - curz;
+		gpAnimBlendClump->pedPosition->x = x - curx;
+		gpAnimBlendClump->pedPosition->y = y - cury;
+		gpAnimBlendClump->pedPosition->z = z - curz;
 		if(looped){
-			gpAnimBlendClump->d[0] += endx;
-			gpAnimBlendClump->d[1] += endy;
-			gpAnimBlendClump->d[2] += endz;
+			gpAnimBlendClump->pedPosition->x += endx;
+			gpAnimBlendClump->pedPosition->y += endy;
+			gpAnimBlendClump->pedPosition->z += endz;
 		}
 		frameData->t.x = pos.x - x + frame->pos.x;
 		frameData->t.y = pos.y - y + frame->pos.y;
@@ -403,11 +403,11 @@ FrameUpdateCallBackSkinnedWithVelocityExtraction(AnimBlendFrameData *frame, CAni
 	}
 
 	if(!(frame->flag & 4)){
-		gpAnimBlendClump->d[0] = x - curx;
-		gpAnimBlendClump->d[1] = y - cury;
+		gpAnimBlendClump->pedPosition->x = x - curx;
+		gpAnimBlendClump->pedPosition->y = y - cury;
 		if(looped){
-			gpAnimBlendClump->d[0] += endx;
-			gpAnimBlendClump->d[1] += endy;
+			gpAnimBlendClump->pedPosition->x += endx;
+			gpAnimBlendClump->pedPosition->y += endy;
 		}
 		frameData->t.x = pos.x - x;
 		frameData->t.y = pos.y - y;
@@ -434,7 +434,7 @@ FrameUpdateCallBackSkinned(AnimBlendFrameData *frame, void *arg)
 	RpHAnimStdKeyFrame *frameData = frame->hanimframe;
 	CAnimBlendNode **node;
 
-	if (frame->flag & 8 && gpAnimBlendClump->d){
+	if (frame->flag & 8 && gpAnimBlendClump->pedPosition){
 		if(frame->flag & 0x10)
 			FrameUpdateCallBackSkinnedWith3dVelocityExtraction(frame, nodes);
 		else
