@@ -388,11 +388,11 @@ struct CPed : public CPhysical
 	char byteWepSkills;
 	char byteWepAccuracy;
 	int pPointGunAt;
-	int field_4A0;
-	int field_4A4;
-	int field_4A8;
+	CVector vecHitLastPos;
 	int dwLastHitState;
-	int fightValue2;
+	char byteFightFlags1;
+	char byteFightFlags2;
+	char pad_4B2[2];
 	int pPedFire;
 	int pPedFight;
 	int fLookDirection;
@@ -505,6 +505,41 @@ CAnimBlendAssociation *RpAnimBlendGetNextAssociation(CAnimBlendAssociation *asso
 //extern RpAtomic *atomicArray[20];
 //extern int atomicArraySP;
 //void atomicsToArray(RpClump *clump);
+
+enum BoneTag {
+	BONE_Swaist,
+	BONE_Supperlegr,
+	BONE_Slowerlegr,
+	BONE_Sfootr,
+	BONE_Supperlegl,
+	BONE_Slowerlegl,
+	BONE_Sfootl,
+	BONE_Smid,
+	BONE_Storso,
+	BONE_Shead,
+	BONE_Supperarmr,
+	BONE_Slowerarmr,
+	BONE_SRhand,
+	BONE_Supperarml,
+	BONE_Slowerarml,
+	BONE_SLhand,
+};
+
+enum PedNode {
+	PED_Swaist,
+	PED_Storso,
+	PED_Shead,
+	PED_Supperarml,
+	PED_Supperarmr,
+	PED_SLhand,
+	PED_SRhand,
+	PED_Supperlegl,
+	PED_Supperlegr,
+	PED_Sfootl,
+	PED_Sfootr,
+	PED_Slowerlegr,
+	PED_Slowerlegl
+};
 
 struct RFrame {
 	CQuaternion rot;

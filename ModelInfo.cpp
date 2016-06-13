@@ -139,7 +139,6 @@ CPedModelInfo::SetClump(RpClump *clump)
 	this->SetFrameIds(0x5FE7A4);	// CPedModelInfo::m_pPedIds
 	if(this->hitColModel == NULL && !IsClumpSkinned(clump))
 		this->CreateHitColModel();
-		//CPedModelInfo__CreateHitColModel((int)this);
 	// again, because CClumpModelInfo::SetClump resets renderCB
 	if(isplayer)
 		RpClumpForAllAtomics(clump, (RpAtomicCallBack)0x4F8940, (void*)0x528B30);	// CClumpModelInfo::SetAtomicRendererCB, CVisibilityPlugins::RenderPlayerCB
@@ -214,7 +213,19 @@ struct ColLimb
 	float radius;
 };
 
-ColLimb *ColLimbs = (ColLimb*)0x5FE848;
+// this is very weird....names and IDs mixed, WHY?
+ColLimb m_pColNodeInfos[8] = {
+	{ NULL,         PED_Shead,       6,  0.0f,   0.05f, 0.2f },
+	{ "Storso",     0,               0,  0.0f,   0.15f, 0.2f },
+	{ "Storso",     0,               0,  0.0f,  -0.05f, 0.3f },
+	{ NULL,         PED_Storso,      1,  0.0f,  -0.07f, 0.3f },
+	{ NULL,         PED_Supperarml,  2,  0.07f, -0.1f,  0.2f },
+	{ NULL,         PED_Supperarmr,  3, -0.07f, -0.1f,  0.2f },
+	{ "Slowerlegl", 0,               4,  0.0f,   0.07f, 0.25f },
+	{ NULL,         PED_Slowerlegr,  5,  0.0f,   0.07f, 0.25f },
+};
+
+//ColLimb *ColLimbs = (ColLimb*)0x5FE848;
 
 CColModel*
 CPedModelInfo::AnimatePedColModelSkinned(RpClump *clump)
@@ -224,26 +235,26 @@ CPedModelInfo::AnimatePedColModelSkinned(RpClump *clump)
 		this->CreateHitColModelSkinned(clump);
 		return this->hitColModel;
 	}
-	RwMatrix *m1, *m2;
+	RwMatrix *invmat, *mat;
 	CColSphere *spheres = colmodel->spheres;
 	RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(clump);
-	m1 = RwMatrixCreate();
-	m2 = RwMatrixCreate();
-	RwMatrixInvert(m1, &RpClumpGetFrame(clump)->modelling);
+	invmat = RwMatrixCreate();
+	mat = RwMatrixCreate();
+	RwMatrixInvert(invmat, &RpClumpGetFrame(clump)->modelling);
 	for(int i = 0; i < 8; i++){
-		*m2 = *m1;
-		int id = ConvertPedNode2BoneTag(ColLimbs[i].id);
-		int idx = RpHAnimIDGetIndex(hier, id);
-		RwMatrixTransform(m2, &RpHAnimHierarchyGetMatrixArray(hier)[idx], rwCOMBINEPRECONCAT);
 		RwV3d pos;
 		pos.x = pos.y = pos.z = 0.0f;
-		RwV3dTransformPoints(&pos, &pos, 1, m2);
-		spheres[i].center.x = pos.x + ColLimbs[i].x;
+		*mat = *invmat;
+		int id = ConvertPedNode2BoneTag(m_pColNodeInfos[i].id);
+		int idx = RpHAnimIDGetIndex(hier, id);
+		RwMatrixTransform(mat, &RpHAnimHierarchyGetMatrixArray(hier)[idx], rwCOMBINEPRECONCAT);
+		RwV3dTransformPoints(&pos, &pos, 1, mat);
+		spheres[i].center.x = pos.x + m_pColNodeInfos[i].x;
 		spheres[i].center.y = pos.y + 0.0f;
-		spheres[i].center.z = pos.z + ColLimbs[i].z;
+		spheres[i].center.z = pos.z + m_pColNodeInfos[i].z;
 	}
-	RwMatrixDestroy(m1);
-	RwMatrixDestroy(m2);
+	RwMatrixDestroy(invmat);
+	RwMatrixDestroy(mat);
 	return colmodel;
 }
 
@@ -252,28 +263,28 @@ CPedModelInfo::CreateHitColModelSkinned(RpClump *clump)
 {
 	CVector center;
 	RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(clump);
-	CColModel *colmodel = (CColModel*)gta_nw(0x58);
+	CColModel *colmodel = (CColModel*)gta_nw(sizeof(CColModel));
 	colmodel->ctor();
 	CColSphere *spheres = (CColSphere*)RwMalloc(8*sizeof(CColSphere));
-	RwMatrix *m1, *m2;
-	m1 = RwMatrixCreate();
-	m2 = RwMatrixCreate();
-	RwMatrixInvert(m1, &RpClumpGetFrame(clump)->modelling);
+	RwMatrix *invmat, *mat;
+	invmat = RwMatrixCreate();
+	mat = RwMatrixCreate();
+	RwMatrixInvert(invmat, &RpClumpGetFrame(clump)->modelling);
 	for(int i = 0; i < 8; i++){
-		*m2 = *m1;
-		int id = ConvertPedNode2BoneTag(ColLimbs[i].id);
+		*mat = *invmat;
+		int id = ConvertPedNode2BoneTag(m_pColNodeInfos[i].id);	// this is wrong, wtf R* ???
 		int idx = RpHAnimIDGetIndex(hier, id);
-		RwMatrixTransform(m2, &RpHAnimHierarchyGetMatrixArray(hier)[idx], rwCOMBINEPRECONCAT);
+		RwMatrixTransform(mat, &RpHAnimHierarchyGetMatrixArray(hier)[idx], rwCOMBINEPRECONCAT);
 		RwV3d pos;
 		pos.x = pos.y = pos.z = 0.0f;
-		RwV3dTransformPoints(&pos, &pos, 1, m2);
-		center.x = pos.x + ColLimbs[i].x;
+		RwV3dTransformPoints(&pos, &pos, 1, mat);
+		center.x = pos.x + m_pColNodeInfos[i].x;
 		center.y = pos.y + 0.0f;
-		center.z = pos.z + ColLimbs[i].z;
-		spheres[i].Set(ColLimbs[i].radius, &center, 17, ColLimbs[i].flag);
+		center.z = pos.z + m_pColNodeInfos[i].z;
+		spheres[i].Set(m_pColNodeInfos[i].radius, &center, 17, m_pColNodeInfos[i].flag);
 	}
-	RwMatrixDestroy(m1);
-	RwMatrixDestroy(m2);
+	RwMatrixDestroy(invmat);
+	RwMatrixDestroy(mat);
 	colmodel->spheres = spheres;
 	colmodel->numSpheres = 8;
 	center.x = center.y = center.z = 0.0f;
@@ -299,33 +310,33 @@ CPedModelInfo::CreateHitColModel(void)
 		RwFrame *out;
 	} search;
 	CVector center;
-	CColModel *colmodel = (CColModel*)gta_nw(0x58);
+	CColModel *colmodel = (CColModel*)gta_nw(sizeof(CColModel));
 	colmodel->ctor();
 	CColSphere *spheres = (CColSphere*)RwMalloc(8*sizeof(CColSphere));
 	RwFrame *root = RpClumpGetFrame(this->clump);
 	RwMatrix *mat = RwMatrixCreate();
 	for(int i = 0; i < 8; i++){
-		if(ColLimbs[i].name){
-			search.name = ColLimbs[i].name;
+		if(m_pColNodeInfos[i].name){
+			search.name = m_pColNodeInfos[i].name;
 			search.out = NULL;
-			RwFrameForAllChildren(root, (RwFrameCallBack)0x4F8960, &search);
+			RwFrameForAllChildren(root, (RwFrameCallBack)0x4F8960, &search);	// CClumpModelInfo::FindFrameFromNameCB
 		}else{
-			search.id = ColLimbs[i].id;
+			search.id = m_pColNodeInfos[i].id;
 			search.out = NULL;
-			RwFrameForAllChildren(root, (RwFrameCallBack)0x4F8AD0, &search);
+			RwFrameForAllChildren(root, (RwFrameCallBack)0x4F8AD0, &search);	// CClumpModelInfo::FindFrameFromIdCB
 		}
 		RwFrame *f = search.out;
 		if(f){
-			float radius = ColLimbs[i].radius;
-			if(ColLimbs[i].id == 6)
-				RwFrameForAllObjects(root, (RwObjectCallBack)0x5104A0, &radius);
+			float radius = m_pColNodeInfos[i].radius;
+			if(m_pColNodeInfos[i].flag == 6)
+				RwFrameForAllObjects(root, (RwObjectCallBack)0x5104A0, &radius);	// FindHeadRadiusCB
 			*mat = f->modelling;
 			for(f = RwFrameGetParent(f); f != root; f = RwFrameGetParent(f))
 				RwMatrixTransform(mat, &f->modelling, rwCOMBINEPOSTCONCAT);
-			center.x = mat->pos.x + ColLimbs[i].x;
+			center.x = mat->pos.x + m_pColNodeInfos[i].x;
 			center.y = mat->pos.y + 0.0f;
-			center.z = mat->pos.z + ColLimbs[i].z;
-			spheres[i].Set(radius, &center, 17, ColLimbs[i].flag);
+			center.z = mat->pos.z + m_pColNodeInfos[i].z;
+			spheres[i].Set(radius, &center, 17, m_pColNodeInfos[i].flag);
 		}
 	}
 	RwMatrixDestroy(mat);

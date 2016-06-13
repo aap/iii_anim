@@ -262,6 +262,9 @@ patch10(void)
 	MemoryVP::Patch(0x50B70B, &CModelInfo::ms_pedModelStore);
 	MemoryVP::Patch(0x50B708, (BYTE)sizeof(CPedModelInfo));
 
+	// bat FX
+	MemoryVP::Nop(0x518DB6, 5);
+	
 	pedikhooks();
 	pedhooks();
 

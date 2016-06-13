@@ -637,12 +637,14 @@ pedhooks(void)
 
 	MemoryVP::InjectHook(0x55D813, FireInstantHit_hook, PATCH_JUMP);
 
+	/* don't animate the hit col model, doesn't really work and is unneeded */
 	// redirect two short jumps to alignment bytes and insert jump there
-	MemoryVP::Patch<BYTE>(0x4B0D26, 0x13);
-	MemoryVP::Patch<BYTE>(0x4B0D35, 0x4);
-	MemoryVP::InjectHook(0x4B0D3A, ProcessLineOfSightSectorList_hook, PATCH_JUMP);
+//	MemoryVP::Patch<BYTE>(0x4B0D26, 0x13);
+//	MemoryVP::Patch<BYTE>(0x4B0D35, 0x4);
+//	MemoryVP::InjectHook(0x4B0D3A, ProcessLineOfSightSectorList_hook, PATCH_JUMP);
+//	MemoryVP::InjectHook(0x4E900C, FightStrike_hook, PATCH_JUMP);
 
-	MemoryVP::InjectHook(0x4E900C, FightStrike_hook, PATCH_JUMP);
+
 
 	//MemoryVP::Patch<BYTE>(0x55D2E0, 0xCC);	// CWeapon::FireInstantHit	done
 	//MemoryVP::Patch<BYTE>(0x4EB5C0, 0xCC);	// CPed::DoesLOSBulletHitPed	done

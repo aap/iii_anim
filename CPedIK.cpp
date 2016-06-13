@@ -246,11 +246,6 @@ CPedIK::PointGunInDirectionUsingArm(float phi, float theta)
 	}else{
 		RwFrame *f = this->ped->frames[4]->frame;
 		mat = CPedIK::GetWorldMatrix((RwFrame*)f->object.parent, RwMatrixCreate());
-
-		vec2.x = mat->right.z;
-		vec2.y = mat->up.z;
-		vec2.z = mat->at.z;
-
 		CPedIK::ExtractYawAndPitchWorld(mat, &alpha, &beta);
 		RwMatrixDestroy(mat);
 	}
@@ -281,11 +276,11 @@ CPedIK::PointGunInDirectionUsingArm(float phi, float theta)
 		RwFrame *f = this->ped->frames[4]->frame;
 		pos = f->modelling.pos;
 
-//		mat = CPedIK::GetWorldMatrix((RwFrame*)f->object.parent, RwMatrixCreate());
-//		vec2.x = mat->right.z;
-//		vec2.y = mat->up.z;
-//		vec2.z = mat->at.z;
-//		RwMatrixDestroy(mat);
+		mat = CPedIK::GetWorldMatrix((RwFrame*)f->object.parent, RwMatrixCreate());
+		vec2.x = mat->right.z;
+		vec2.y = mat->up.z;
+		vec2.z = mat->at.z;
+		RwMatrixDestroy(mat);
 
 		RwMatrixRotate(&f->modelling, &vec1, RAD2DEG(this->upperArmOrient.theta), rwCOMBINEPOSTCONCAT);
 		RwMatrixRotate(&f->modelling, &vec2, RAD2DEG(this->upperArmOrient.phi), rwCOMBINEPOSTCONCAT);

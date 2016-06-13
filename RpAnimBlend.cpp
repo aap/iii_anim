@@ -178,7 +178,12 @@ FillFrameArrayCallback(AnimBlendFrameData *frame, void *arg)
 int
 ConvertPedNode2BoneTag(int node)
 {
-	static int tags[] = { 0, 8, 9, 13, 10, 15, 12, 4, 1, 6, 3, 2, 5 };
+	static int tags[] = { BONE_Swaist, BONE_Storso, BONE_Shead,
+	                      BONE_Supperarml, BONE_Supperarmr,
+	                      BONE_SLhand, BONE_SRhand,
+	                      BONE_Supperlegl, BONE_Supperlegr,
+	                      BONE_Sfootl, BONE_Sfootr,
+	                      BONE_Slowerlegr, BONE_Slowerlegl };
 	if(node > 12)
 		return -1;
 	return tags[node];
