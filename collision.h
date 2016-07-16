@@ -1,5 +1,6 @@
-typedef BYTE byte;
-typedef BYTE uchar;
+typedef unsigned char byte;
+typedef unsigned char uchar;
+typedef unsigned short ushort;
 
 struct CColSphere
 {

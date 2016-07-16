@@ -84,16 +84,17 @@
     <ClInclude Include="MemoryMgr.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CAnimBlendAssocGroup.cpp" />
-    <ClCompile Include="CAnimBlendAssociation.cpp" />
-    <ClCompile Include="CAnimBlendClumpData.cpp" />
-    <ClCompile Include="CAnimBlendHierarchy.cpp" />
-    <ClCompile Include="CAnimBlendNode.cpp" />
-    <ClCompile Include="CAnimBlendSequence.cpp" />
-    <ClCompile Include="CAnimManager.cpp" />
+    <ClCompile Include="AnimBlendAssocGroup.cpp" />
+    <ClCompile Include="AnimBlendAssociation.cpp" />
+    <ClCompile Include="AnimBlendClumpData.cpp" />
+    <ClCompile Include="AnimBlendHierarchy.cpp" />
+    <ClCompile Include="AnimBlendNode.cpp" />
+    <ClCompile Include="AnimBlendSequence.cpp" />
+    <ClCompile Include="AnimManager.cpp" />
+    <ClCompile Include="Object.cpp" />
     <ClCompile Include="collision.cpp" />
-    <ClCompile Include="CPed.cpp" />
-    <ClCompile Include="CPedIK.cpp" />
+    <ClCompile Include="Ped.cpp" />
+    <ClCompile Include="PedIK.cpp" />
     <ClCompile Include="frameUpdate.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="RpAnimBlend.cpp" />

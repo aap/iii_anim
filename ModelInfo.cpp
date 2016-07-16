@@ -6,6 +6,8 @@ WRAPPER void CClumpModelInfo::SetFrameIds(int ids) { EAXJMP(0x4F8BB0); }
 //WRAPPER void __fastcall CPedModelInfo__CreateHitColModel(int self) { EAXJMP(0x5104D0); }
 WRAPPER void __fastcall CPedModelInfo__DeleteRwObject_orig(CPedModelInfo*) { EAXJMP(0x510280); }
 
+WRAPPER RpAtomic *CVisibilityPlugins__RenderPlayerCB(RpAtomic*) { EAXJMP(0x528B30); }
+
 static RpAtomic*
 SetHierarchyForSkinAtomic(RpAtomic *atomic, void *data)
 {
@@ -34,28 +36,27 @@ HAnimAnimationCreateForHierarchy(RpHAnimHierarchy *hier)
 RpClump*
 CClumpModelInfo::CreateInstance(void)
 {
-	RpClump *clone, *clone2;
 	RpClump *clump = this->clump;
 	if(clump == NULL)
 		return NULL;
 
-	clone2 = RpClumpClone(clump);
-	clone = RpClumpClone(clone2);	// to reverse order of... something again...
-	RpClumpDestroy(clone2);
-	//clone = clone2;
+//	RpClump *clone, *clone2;
+//	clone2 = RpClumpClone(clump);
+//	clone = RpClumpClone(clone2);	// to reverse order of frames again...
+//	RpClumpDestroy(clone2);
+//	//clone = clone2;
 
-//	RpClump *clone = RpClumpClone(clump);
+	RpClump *clone = RpClumpClone(clump);
 	if(IsClumpSkinned(clone)){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromClump(clone);
 		RpClumpForAllAtomics(clone, SetHierarchyForSkinAtomic, hier);
 		RpHAnimAnimation *anim = HAnimAnimationCreateForHierarchy(hier);
 		RpHAnimHierarchySetCurrentAnim(hier, anim);
 		RpHAnimHierarchySetFlags(hier, rpHANIMHIERARCHYUPDATEMODELLINGMATRICES|rpHANIMHIERARCHYUPDATELTMS);
-/*	xbox:
-		v6 = RpSkinGeometryGetSkin(v5->geometry);
-		RpSkinGetNumBones(v6);
-		RpHAnimHierarchyUpdateMatrices(v3);
-*/
+		// xbox nonsense:
+		// v6 = RpSkinGeometryGetSkin(v5->geometry);
+		// RpSkinGetNumBones(v6);
+		RpHAnimHierarchyUpdateMatrices(hier);
 	}
 	return clone;	
 }
@@ -66,10 +67,16 @@ CClumpModelInfo::SetClump(RpClump *clump)
 	this->clump = clump;
 	CVisibilityPlugins__SetClumpModelInfo(clump, (int)this);
 	CBaseModelInfo__AddTexDictionaryRef((int)this);
-	RpClumpForAllAtomics(clump, (RpAtomicCallBack)0x4F8940, 0);	// CClumpModelInfo::SetAtomicRendererCB
-	// Xbox sets world pipeline depending on *(this+42) here
-	if(strcmp(this->name, "playerh") == 0)
-		RpClumpForAllAtomics(clump, (RpAtomicCallBack)0x4F8940, (void*)0x528B30);	// CClumpModelInfo::SetAtomicRendererCB, CVisibilityPlugins::RenderPlayerCB
+	RpClumpForAllAtomics(clump, CClumpModelInfo::SetAtomicRendererCB, NULL);
+	if(this->type == 1 || // CSimpleModelInfo
+	   this->type == 3 || // CTimeModelInfo
+	   this->type == 4){  // CClumpModelInfo
+		// set world pipeline??? o_O
+	}
+
+	// xbox skin is not compatible with player head!
+//	if(strncmp(this->name, "playerh", 8) == 0)
+//		RpClumpForAllAtomics(clump, CClumpModelInfo::SetAtomicRendererCB, CVisibilityPlugins__RenderPlayerCB);
 
 	if(IsClumpSkinned(clump)){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromClump(clump);
@@ -94,6 +101,8 @@ CClumpModelInfo::SetClump(RpClump *clump)
 		RpHAnimHierarchySetFlags(hier, rpHANIMHIERARCHYUPDATEMODELLINGMATRICES|rpHANIMHIERARCHYUPDATELTMS);
 	}
 }
+
+WRAPPER RpAtomic *CClumpModelInfo::SetAtomicRendererCB(RpAtomic*, void*) { EAXJMP(0x4F8940); }
 
 struct LimbCBarg {
 	CPedModelInfo *pedmodelinfo;
@@ -130,7 +139,7 @@ CPedModelInfo::SetClump(RpClump *clump)
 	RpAtomic *atomic;
 	// set renderCB before removing Atomics from Clump
 	if(isplayer)
-		RpClumpForAllAtomics(clump, (RpAtomicCallBack)0x4F8940, (void*)0x528B30);	// CClumpModelInfo::SetAtomicRendererCB, CVisibilityPlugins::RenderPlayerCB
+		RpClumpForAllAtomics(clump, CClumpModelInfo::SetAtomicRendererCB, CVisibilityPlugins__RenderPlayerCB);
 	if(atomic = IsClumpSkinned(clump)){
 		LimbCBarg limbs = { this, clump, 0, 0, 0 };
 		RpClumpForAllAtomics(clump, CPedModelInfo__findLimbsCb, &limbs);
@@ -141,7 +150,7 @@ CPedModelInfo::SetClump(RpClump *clump)
 		this->CreateHitColModel();
 	// again, because CClumpModelInfo::SetClump resets renderCB
 	if(isplayer)
-		RpClumpForAllAtomics(clump, (RpAtomicCallBack)0x4F8940, (void*)0x528B30);	// CClumpModelInfo::SetAtomicRendererCB, CVisibilityPlugins::RenderPlayerCB
+		RpClumpForAllAtomics(clump, CClumpModelInfo::SetAtomicRendererCB, CVisibilityPlugins__RenderPlayerCB);
 }
 
 CPedModelInfo::CPedModelInfo(void)

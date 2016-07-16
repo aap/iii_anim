@@ -15,12 +15,14 @@ WRAPPER RwMatrix *RwMatrixTransform(RwMatrix*, const RwMatrix*, RwOpCombineType)
 WRAPPER RwMatrix *RwMatrixRotate(RwMatrix*, const RwV3d*, RwReal, RwOpCombineType) { EAXJMP(0x5A2BF0); }
 WRAPPER RwMatrix *RwMatrixCreate(void) { EAXJMP(0x5A3330); }
 WRAPPER RwBool RwMatrixDestroy(RwMatrix*) { EAXJMP(0x5A3300); }
+WRAPPER RwMatrix *RwFrameGetLTM(RwFrame *) { EAXJMP(0x5A1CE0); }
 WRAPPER RwFrame *RwFrameForAllChildren(RwFrame*, RwFrameCallBack, void*) { EAXJMP(0x5A1FC0); }
 WRAPPER RwFrame *RwFrameForAllObjects(RwFrame*, RwObjectCallBack, void*) { EAXJMP(0x5A2340); }
 WRAPPER RwFrame *RwFrameUpdateObjects(RwFrame*) { EAXJMP(0x5A1C60); }
 WRAPPER RwFrame *RwFrameRemoveChild(RwFrame *) { EAXJMP(0x5A1ED0); }
 WRAPPER RwBool RwFrameDestroy(RwFrame*) { EAXJMP(0x5A1A30); }
 WRAPPER RwV3d *RwV3dTransformPoints(RwV3d*, const RwV3d*, RwInt32, const RwMatrix*) { EAXJMP(0x5A37D0); }
+WRAPPER RwReal RwV3dLength(const RwV3d*) { EAXJMP(0x5A36A0); }
 WRAPPER RwBool RpClumpDestroy(RpClump*) { EAXJMP(0x59F500); }
 WRAPPER RpClump *RpClumpForAllAtomics(RpClump*, RpAtomicCallBack, void*) { EAXJMP(0x59EDD0); }
 WRAPPER RpClump *RpClumpClone(RpClump*) { EAXJMP(0x59F1B0); }
@@ -34,6 +36,7 @@ WRAPPER RpHAnimHierarchy *RpSkinAtomicGetHAnimHierarchy(const RpAtomic*) { EAXJM
 WRAPPER RwBool RpHAnimHierarchyUpdateMatrices(RpHAnimHierarchy *hierarchy) { EAXJMP(0x5B1780); }
 WRAPPER RpHAnimHierarchy *RpHAnimFrameGetHierarchy(RwFrame*) { EAXJMP(0x5B11F0); }
 WRAPPER RwBool RpHAnimHierarchySetCurrentAnim(RpHAnimHierarchy*, RpHAnimAnimation*) { EAXJMP(0x5B1200); }
+WRAPPER RwBool RpHAnimHierarchyAddAnimTime(RpHAnimHierarchy*, RwReal) { EAXJMP(0x5B1480); }
 
 WRAPPER const char *GetFrameNodeName(RwFrame *frame) { EAXJMP(0x527150); }
 WRAPPER void *GetModelFromName(char *name) { EAXJMP(0x4010D0); }
@@ -47,10 +50,16 @@ WRAPPER void CQuaternion::Get(RwMatrix *mat) { EAXJMP(0x4BA0D0); }
 WRAPPER void CMatrix::ctor(RwMatrix *, bool) { EAXJMP(0x4B8D90); }
 WRAPPER void CMatrix::dtor(void) { EAXJMP(0x4B8DB0); }
 WRAPPER void CMatrix::RotateX(float) { EAXJMP(0x4B9510); }
+WRAPPER void CMatrix::SetRotateY(float) { EAXJMP(0x4B9340); }
 WRAPPER void CMatrix::SetRotateZ(float) { EAXJMP(0x4B9370); }
 WRAPPER void CMatrix::UpdateRW(void) { EAXJMP(0x4B8EC0); }
+WRAPPER void CMatrix::mult(CMatrix *out, CMatrix *in1, CMatrix *in2) { EAXJMP(0x4B9D60); }
+WRAPPER void CMatrix::assign(CMatrix *in) { EAXJMP(0x4B8F40); }
 WRAPPER void CVector::Normalize(void) { EAXJMP(0x4BA560); };
 WRAPPER void CrossProduct(CVector *, CVector *, CVector *) { EAXJMP(0x4BA350); }
+
+WRAPPER void CEntity::UpdateRwFrame(void) { EAXJMP(0x474330); }
+WRAPPER void CPhysical::ProcessControl(void) { EAXJMP(0x495F10); }
 
 void **CModelInfo::ms_modelInfoPtrs = (void**)0x83D408;
 
@@ -106,24 +115,6 @@ IsClumpSkinned(RpClump *c)
 	return ret;
 }
 
-/*
-RpAtomic *atomicArray[20];
-int atomicArraySP = 0;
-
-static RpAtomic*
-atomicsToArrayCB(RpAtomic *atomic, void *)
-{
-	return atomicArray[atomicArraySP++] = atomic;
-}
-
-void
-atomicsToArray(RpClump *clump)
-{
-	atomicArraySP = 0;
-	RpClumpForAllAtomics(clump, atomicsToArrayCB, NULL);
-}
-*/
-
 void
 dumpAnimGroups(void)
 {
@@ -141,23 +132,6 @@ dumpAnimGroups(void)
 void
 patch10(void)
 {
-/*
-	if(sizeof(CAnimBlendSequence) != 0x2C ||		//
-	   sizeof(CAnimBlendHierarchy) != 0x28 ||
-	   sizeof(CAnimBlock) != 0x20 ||
-	   sizeof(CAnimBlendNode) != 0x1C ||
-	   sizeof(CAnimBlendAssociation) != 0x40 ||		//
-	   sizeof(CAnimBlendAssocGroup) != 0x8 ||
-	   sizeof(AnimBlendFrameData) != 0x14 ||
-	   sizeof(CAnimBlendClumpData) != 0x14 ||
-	   sizeof(RFrame) != 0x14 ||
-	   sizeof(RTFrame) != 0x20){
-		printf("SIZE MISMATCH\n");
-		return;
-	}
-	printf("sizes ok\n");
-*/
-
 	MemoryVP::InjectHook(0x401000, &CAnimBlendAssocGroup::ctor, PATCH_JUMP);
 	MemoryVP::InjectHook(0x401130, static_cast<void(CAnimBlendAssocGroup::*)(const char*)>(&CAnimBlendAssocGroup::CreateAssociations), PATCH_JUMP);
 	MemoryVP::InjectHook(0x401220, static_cast<void(CAnimBlendAssocGroup::*)(const char *name, RpClump *clump, char **names, int numAnims)>(&CAnimBlendAssocGroup::CreateAssociations), PATCH_JUMP);
@@ -264,19 +238,22 @@ patch10(void)
 
 	// bat FX
 	MemoryVP::Nop(0x518DB6, 5);
+	// flying limbs
+	MemoryVP::Nop(0x4EAF17, 2);
 	
 	pedikhooks();
 	pedhooks();
+	objecthooks();
 
 	//dumpAnimGroups();
 
-	// TODO:
-	//	CCutsceneHead::CCutsceneHead
-	//	CCutsceneHead::ProcessControl
-	//	CCutsceneHead::Render
-	//	CCutsceneObject::ProcessControl
-	//	CCutsceneObject::Render
-	//	 CCutsceneObject::RenderLimb
+	// DONE:
+	//	-CCutsceneHead::CCutsceneHead
+	//	-CCutsceneHead::ProcessControl
+	//	-CCutsceneHead::Render
+	//	-CCutsceneObject::ProcessControl
+	//	-CCutsceneObject::Render
+	//	 -CCutsceneObject::RenderLimb
 	//	-CCopPed::CopAI
 	//	 -CPedModelInfo::CreateHitColModelSkinned
 	//	 -CPedModelInfo::AnimatePedColModelSkinned
@@ -284,9 +261,11 @@ patch10(void)
 	//	-CPed::StartFightDefend
 	//	-CPed::FightStrike
 	//	-CWorld::ProcessLineOfSightSectorList
-	// unknown: sub_14C8AA
+	// -CPed::SpawnFlyingComponent	removed
+	// TODO:
 	// xbox only: script 756
-	// mobile only: CCutsceneHead::RenderLimb
+	// hand shit: sub_14C8AA
+	// mobile only: CCutsceneHead::RenderLimb ??
 }
 
 BOOL WINAPI

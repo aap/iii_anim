@@ -19,6 +19,7 @@ typedef unsigned int uint;
 
 void pedhooks(void);
 void pedikhooks(void);
+void objecthooks(void);
 
 #define RwEngineInstance (*rwengine)
 extern void **rwengine;
@@ -92,13 +93,17 @@ struct CMatrix
 {
 	RwMatrix matrix;
 	RwMatrix *pMatrix;
-	int haveRwMatrix;
+	bool haveRwMatrix;
 
 	void ctor(RwMatrix *, bool);
 	void dtor(void);
 	void RotateX(float);
+	void SetRotateY(float);
 	void SetRotateZ(float);
 	void UpdateRW(void);
+	void assign(CMatrix*);
+
+	static void mult(CMatrix *out, CMatrix *in1, CMatrix *in2);
 };
 
 class CQuaternion {
@@ -183,6 +188,7 @@ struct CPlaceable
 	void **vtable;
 	CMatrix matrix;
 };
+static_assert(sizeof(CPlaceable) == 0x4C, "CPlaceable: wrong size");
 
 struct CEntity : CPlaceable
 {
@@ -203,7 +209,9 @@ struct CEntity : CPlaceable
 	void SetModelIndex(int id);
 	void Render(void);
 	void UpdateRpHAnim(void);
+	void UpdateRwFrame(void);
 };
+static_assert(sizeof(CEntity) == 0x64, "CEntity: wrong size");
 
 struct CPhysical : CEntity
 {
@@ -242,7 +250,10 @@ struct CPhysical : CEntity
 	char byteLastCollType;
 	char byteZoneLevel;
 	short __padding;
+
+	void ProcessControl(void);
 };
+static_assert(sizeof(CPhysical) == 0x128, "CPhysical: wrong size");
 
 struct CPed;
 
@@ -433,18 +444,118 @@ struct CPed : public CPhysical
 	bool IsPedHeadAbovePos(float dist);
 	char DoesLOSBulletHitPed(CColPoint *colpoint);
 };
+static_assert(sizeof(CPed) == 0x540, "CPed: wrong size");
 
-struct CClumpModelInfo
+struct CObject : public CPhysical
+{
+	int field_128;
+	int field_12C;
+	int field_130;
+	int field_134;
+	int field_138;
+	int field_13C;
+	int field_140;
+	int field_144;
+	int field_148;
+	int field_14C;
+	int field_150;
+	int field_154;
+	int field_158;
+	int field_15C;
+	int field_160;
+	int field_164;
+	int field_168;
+	int field_16C;
+	int field_170;
+	int field_174;
+	int field_178;
+	int field_17C;
+	int field_180;
+	int field_184;
+	int field_188;
+	int field_18C;
+	int field_190;
+	int field_194;
+};
+static_assert(sizeof(CObject) == 0x198, "CObject: wrong size");
+
+int CPools__GetObjectRef(CObject *object);
+
+struct CCutsceneObject : public CObject
+{
+	struct ObjectExt
+	{
+		// CCutsceneObject
+		bool renderHead;
+		bool renderRightHand;
+		bool renderLeftHand;
+	
+		// CCutsceneHead
+		int b;		// unknown
+		CCutsceneObject *object;
+		int d;		// unknown
+		int isSkinned;
+	};
+
+	CCutsceneObject *ctor(void);
+	void ProcessControl(void);
+	void Render(void);
+
+	static ObjectExt objectExt[450];
+	ObjectExt *getExt(void){ return &objectExt[CPools__GetObjectRef(this) >> 8]; }
+	void SetRenderHead(bool r) { getExt()->renderHead = r; }
+	bool GetRenderHead(void) { return getExt()->renderHead; }
+	void SetRenderRightHand(bool r) { getExt()->renderRightHand = r; }
+	bool GetRenderRightHand(void) { return getExt()->renderRightHand; }
+	void SetRenderLeftHand(bool r) { getExt()->renderLeftHand = r; }
+	bool GetRenderLeftHand(void) { return getExt()->renderLeftHand; }
+	void RenderLimb(int id);
+
+	void ctor_orig(void);
+	void ProcessControl_orig(void);
+};
+static_assert(sizeof(CCutsceneObject) == 0x198, "CCutsceneObject: wrong size");
+
+struct CCutsceneHead : public CCutsceneObject
+{
+	RwFrame *head;
+
+	CCutsceneHead *ctor(CObject *object);
+	void ProcessControl(void);
+	void Render(void);
+};
+static_assert(sizeof(CCutsceneHead) == 0x19C, "CCutsceneHead: wrong size");
+
+//
+// Model Info
+//
+
+struct CBaseModelInfo
 {
 	void **vtable;
 	char     name[24];	// no idea what the size really is
-	RwUInt32 data1[5];
+	void *colModel;
+	void *twodeffect;
+	short id;
+	ushort refCount;
+	short txdSlot;
+	uchar type;
+	uchar num2dEffects;
+	bool freeCol;
+};
+static_assert(sizeof(CBaseModelInfo) == 0x30, "CBaseModelInfo: wrong size");
+
+struct CClumpModelInfo : public CBaseModelInfo
+{
 	RpClump *clump;
 
 	RpClump *CreateInstance(void);
 	void SetClump(RpClump*);
 	void SetFrameIds(int ids);
+
+	static RpAtomic *SetAtomicRendererCB(RpAtomic*, void*);
 };
+static_assert(sizeof(CClumpModelInfo) == 0x34, "CBaseModelInfo: wrong size");
 
 struct CPedModelInfo : public CClumpModelInfo
 {
@@ -739,6 +850,7 @@ public:
 	void *nextAssoc;	// pointer to CAnimBlendAssociation::next
 	void *prevAssoc;
 	int numFrames;
+	// xbox has a 4b field here
 	CVector *pedPosition;
 	AnimBlendFrameData *frames;
 
