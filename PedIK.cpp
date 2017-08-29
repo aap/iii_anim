@@ -337,12 +337,12 @@ CPedIK::PointGunInDirection(float phi, float theta)
 void
 pedikhooks(void)
 {
-	MemoryVP::InjectHook(0x4ED0F0, &CPedIK::GetComponentPosition, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4ED620, &CPedIK::LookInDirection, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4ED810, &CPedIK::RestoreLookAt, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4EDDB0, &CPedIK::RotateTorso, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4ED9B0, &CPedIK::PointGunInDirection, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4EDB20, &CPedIK::PointGunInDirectionUsingArm, PATCH_JUMP);
+	InjectHook(0x4ED0F0, &CPedIK::GetComponentPosition, PATCH_JUMP);
+	InjectHook(0x4ED620, &CPedIK::LookInDirection, PATCH_JUMP);
+	InjectHook(0x4ED810, &CPedIK::RestoreLookAt, PATCH_JUMP);
+	InjectHook(0x4EDDB0, &CPedIK::RotateTorso, PATCH_JUMP);
+	InjectHook(0x4ED9B0, &CPedIK::PointGunInDirection, PATCH_JUMP);
+	InjectHook(0x4EDB20, &CPedIK::PointGunInDirectionUsingArm, PATCH_JUMP);
 
 	//MemoryVP::Patch<BYTE>(0x4ED0F0, 0xcc);	// CPedIK::GetComponentPosition		done
 	//MemoryVP::Patch<BYTE>(0x4EDDB0, 0xcc);	// CPedIK::RotateTorso			done

@@ -17,8 +17,18 @@ CEntity::UpdateRpHAnim(void)
 WRAPPER int CPools__GetPedRef(CPed *ped) { EAXJMP(0x4A1A80); }
 
 WRAPPER void CPed::SetPedStats(int x) { EAXJMP(0x4C5330); }
+WRAPPER CPed *CPed::ctor_orig(uint type) { EAXJMP(0x4C41C0); }
 
 RpAtomic *weaponAtomics[140];
+
+CPed*
+CPed::ctor(uint type)
+{
+	this->ctor_orig(type);
+	int pedid = CPools__GetPedRef(this) >> 8;
+	weaponAtomics[pedid] = NULL;
+	return this;
+}
 
 void
 CPed::SetModelIndex(int id)
@@ -35,6 +45,8 @@ CPed::SetModelIndex(int id)
 	clumpData->pedPosition = &this->vecAnimMoveDelta;
 	if(pedinfo->hitColModel == NULL)
 		pedinfo->CreateHitColModelSkinned(this->clump);
+	if(!IsClumpSkinned(clump))
+		AttachRimPipeToRwObject((RwObject*)clump);
 }
 
 void
@@ -71,6 +83,7 @@ void __fastcall
 cped__render__hook(CPed *ped)
 {
 	ped->CEntity::Render();
+
 	if(IsClumpSkinned(ped->clump)){
 		ped->renderLimb(2);
 		ped->renderLimb(5);
@@ -99,6 +112,8 @@ CPed::AddWeaponModel(int id)
 	if(IsClumpSkinned(this->clump)){
 		int pedid = CPools__GetPedRef(this) >> 8;
 		weaponAtomics[pedid] = atomic;
+		if(id == 183)	// finger
+			AttachRimPipeToRwObject((RwObject*)atomic);
 	}else{
 		RwFrameDestroy(RpAtomicGetFrame(atomic));
 		RpAtomicSetFrame(atomic, this->frames[6]->frame);
@@ -609,38 +624,45 @@ FightStrike_hook(void)
 void
 pedhooks(void)
 {
-	MemoryVP::InjectHook(0x4C52A0, &CPed::SetModelIndex, PATCH_JUMP);
+	InjectHook(0x4C52A0, &CPed::SetModelIndex, PATCH_JUMP);
 	// call to CEntity::Render() in CPed::Render
-	MemoryVP::InjectHook(0x4CF8F0, &CPed::AddWeaponModel, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4CF980, &CPed::RemoveWeaponModel, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4EB670, &CPed::IsPedHeadAbovePos, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4EB5C0, &CPed::DoesLOSBulletHitPed, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4D0484, cped__render__hook);
+	InjectHook(0x4CF8F0, &CPed::AddWeaponModel, PATCH_JUMP);
+	InjectHook(0x4CF980, &CPed::RemoveWeaponModel, PATCH_JUMP);
+	InjectHook(0x4EB670, &CPed::IsPedHeadAbovePos, PATCH_JUMP);
+	InjectHook(0x4EB5C0, &CPed::DoesLOSBulletHitPed, PATCH_JUMP);
+	InjectHook(0x4D0484, cped__render__hook);
 
-	MemoryVP::InjectHook(0x4CFE17, cped_prerender_hook1, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4CFE92, cped_prerender_hook2, PATCH_JUMP);
+	InjectHook(0x4CFE17, cped_prerender_hook1, PATCH_JUMP);
+	InjectHook(0x4CFE92, cped_prerender_hook2, PATCH_JUMP);
 
-	MemoryVP::InjectHook(0x4C788B, CalculateNewVelocity_hook, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4CC811, PlayFootSteps_hook1, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4CC9FB, PlayFootSteps_hook2, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4D7818, FinishLaunchCB_hook1, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4D7970, FinishLaunchCB_hook2, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4E70AE, Attack_hook1, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4E6E81, Attack_hook2, PATCH_JUMP);	// one handed weapons
-	MemoryVP::InjectHook(0x4E8026, Fight_hook, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4E781A, StartFightDefend_hook, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4C1FF0, CopAI_hook, PATCH_JUMP);
+	InjectHook(0x4C788B, CalculateNewVelocity_hook, PATCH_JUMP);
+	InjectHook(0x4CC811, PlayFootSteps_hook1, PATCH_JUMP);
+	InjectHook(0x4CC9FB, PlayFootSteps_hook2, PATCH_JUMP);
+	InjectHook(0x4D7818, FinishLaunchCB_hook1, PATCH_JUMP);
+	InjectHook(0x4D7970, FinishLaunchCB_hook2, PATCH_JUMP);
+	InjectHook(0x4E70AE, Attack_hook1, PATCH_JUMP);
+	InjectHook(0x4E6E81, Attack_hook2, PATCH_JUMP);	// one handed weapons
+	InjectHook(0x4E8026, Fight_hook, PATCH_JUMP);
+	InjectHook(0x4E781A, StartFightDefend_hook, PATCH_JUMP);
+	InjectHook(0x4C1FF0, CopAI_hook, PATCH_JUMP);
+
+	InjectHook(0x4EF7EA, &CPed::ctor);
+	InjectHook(0x4C2E4D, &CPed::ctor);
+	InjectHook(0x4C11BE, &CPed::ctor);
+	InjectHook(0x4BFF3D, &CPed::ctor);
 
 	// not CPed but what the hell
 
-	MemoryVP::InjectHook(0x55D813, FireInstantHit_hook, PATCH_JUMP);
+	InjectHook(0x55D813, FireInstantHit_hook, PATCH_JUMP);
 
-	/* don't animate the hit col model, doesn't really work and is unneeded */
+	// We *have* to animate the hit colmodel because
+	// the initial bone positions at creation are wrong!
 	// redirect two short jumps to alignment bytes and insert jump there
-//	MemoryVP::Patch<BYTE>(0x4B0D26, 0x13);
-//	MemoryVP::Patch<BYTE>(0x4B0D35, 0x4);
-//	MemoryVP::InjectHook(0x4B0D3A, ProcessLineOfSightSectorList_hook, PATCH_JUMP);
-//	MemoryVP::InjectHook(0x4E900C, FightStrike_hook, PATCH_JUMP);
+	Patch<BYTE>(0x4B0D26, 0x13);
+	Patch<BYTE>(0x4B0D35, 0x4);
+	InjectHook(0x4B0D3A, ProcessLineOfSightSectorList_hook, PATCH_JUMP);
+	//
+	InjectHook(0x4E900C, FightStrike_hook, PATCH_JUMP);
 
 
 

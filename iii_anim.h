@@ -11,9 +11,11 @@
 #include <rpworld.h>
 #include <rpskin.h>
 #include <new>
-#include "MemoryMgr.h"
 
 typedef unsigned int uint;
+typedef uintptr_t addr;
+
+#include "MemoryMgr.h"
 
 #define RAD2DEG(x) (180.0f*(x)/M_PI)
 
@@ -28,6 +30,9 @@ void *RwMallocAlign(uint size, int alignment);
 void RwFreeAlign(void*);
 void gtadelete(void*);
 void *gta_nw(int);
+
+// from skygfx for rim pipeline
+extern void (*AttachRimPipeToRwObject)(RwObject *obj);
 
 const char *GetFrameNodeName(RwFrame *frame);
 void *GetModelFromName(char *name);
@@ -436,6 +441,7 @@ struct CPed : public CPhysical
 	float fSeekExAngle;
 	int field_53C;
 
+	CPed *ctor(uint type);
 	void SetModelIndex(int id);
 	void SetPedStats(int x);
 	void renderLimb(int node);
@@ -443,6 +449,8 @@ struct CPed : public CPhysical
 	void RemoveWeaponModel(int i);
 	bool IsPedHeadAbovePos(float dist);
 	char DoesLOSBulletHitPed(CColPoint *colpoint);
+
+	CPed *ctor_orig(uint type);
 };
 static_assert(sizeof(CPed) == 0x540, "CPed: wrong size");
 
@@ -534,7 +542,7 @@ struct CBaseModelInfo
 {
 	void **vtable;
 	char     name[24];	// no idea what the size really is
-	void *colModel;
+	CColModel *colModel;
 	void *twodeffect;
 	short id;
 	ushort refCount;

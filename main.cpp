@@ -11,7 +11,7 @@ WRAPPER void *gta_nw(int) { EAXJMP(0x5A0690); }
 
 WRAPPER RwMatrix *RwMatrixUpdate(RwMatrix*) { EAXJMP(0x5A28E0); }
 WRAPPER RwMatrix *RwMatrixInvert(RwMatrix*, const RwMatrix*) { EAXJMP(0x5A2C90); }
-WRAPPER RwMatrix *RwMatrixTransform(RwMatrix*, const RwMatrix*, RwOpCombineType) { EAXJMP(0x5A2EE0); }
+WRAPPER RwMatrix *RwMatrixTransform(RwMatrix*, const RwMatrix*, RwOpCombineType) { EAXJMP(0x5A31C0); }
 WRAPPER RwMatrix *RwMatrixRotate(RwMatrix*, const RwV3d*, RwReal, RwOpCombineType) { EAXJMP(0x5A2BF0); }
 WRAPPER RwMatrix *RwMatrixCreate(void) { EAXJMP(0x5A3330); }
 WRAPPER RwBool RwMatrixDestroy(RwMatrix*) { EAXJMP(0x5A3300); }
@@ -129,121 +129,152 @@ dumpAnimGroups(void)
 	fclose(f);
 }
 
+void AttachRimPipeToRwObject_dummy(RwObject*){}
+void (*AttachRimPipeToRwObject)(RwObject *obj) = AttachRimPipeToRwObject_dummy;
+
+void (*InitialiseGame)(void);
+void
+InitialiseGame_hook(void)
+{
+	HMODULE sky = GetModuleHandleA("skygfx.asi");
+	if(sky){
+		AttachRimPipeToRwObject = (void (*)(RwObject*))GetProcAddress(sky, "AttachRimPipeToRwObject");
+		if(AttachRimPipeToRwObject == NULL)
+			AttachRimPipeToRwObject = AttachRimPipeToRwObject_dummy;
+	}
+	InitialiseGame();
+}
+
+void hookEntityVtables(void);
+
+RwCamera *&pRwCamera = *(RwCamera**)0x72676C;
+
 void
 patch10(void)
 {
-	MemoryVP::InjectHook(0x401000, &CAnimBlendAssocGroup::ctor, PATCH_JUMP);
-	MemoryVP::InjectHook(0x401130, static_cast<void(CAnimBlendAssocGroup::*)(const char*)>(&CAnimBlendAssocGroup::CreateAssociations), PATCH_JUMP);
-	MemoryVP::InjectHook(0x401220, static_cast<void(CAnimBlendAssocGroup::*)(const char *name, RpClump *clump, char **names, int numAnims)>(&CAnimBlendAssocGroup::CreateAssociations), PATCH_JUMP);
-	MemoryVP::InjectHook(0x4012D0, &CAnimBlendAssocGroup::dtor, PATCH_JUMP);
-	MemoryVP::InjectHook(0x401300, static_cast<CAnimBlendAssociation*(CAnimBlendAssocGroup::*)(const char*)>(&CAnimBlendAssocGroup::GetAnimation), PATCH_JUMP);
-	MemoryVP::InjectHook(0x4013D0, static_cast<CAnimBlendAssociation*(CAnimBlendAssocGroup::*)(uint)>(&CAnimBlendAssocGroup::GetAnimation), PATCH_JUMP);
-	MemoryVP::InjectHook(0x4013E0, static_cast<CAnimBlendAssociation*(CAnimBlendAssocGroup::*)(const char*)>(&CAnimBlendAssocGroup::CopyAnimation), PATCH_JUMP);
-	MemoryVP::InjectHook(0x401420, static_cast<CAnimBlendAssociation*(CAnimBlendAssocGroup::*)(uint)>(&CAnimBlendAssocGroup::CopyAnimation), PATCH_JUMP);
+	// Fail if RenderWare has already been started
+	if(pRwCamera){
+		MessageBox(NULL, "iii_anim cannot be loaded by the default Mss32 ASI loader.\nUse another ASI loader.", "Error", MB_ICONERROR | MB_OK);
+		return;
+	}
 
-	MemoryVP::InjectHook(0x401460, &CAnimBlendAssociation::ctor, PATCH_JUMP);
-	MemoryVP::InjectHook(0x401520, &CAnimBlendAssociation::dtor, PATCH_JUMP);
-	MemoryVP::InjectHook(0x401560, static_cast<void(CAnimBlendAssociation::*)(RpClump *clump, CAnimBlendHierarchy *anim)>(&CAnimBlendAssociation::Init), PATCH_JUMP);
-	MemoryVP::InjectHook(0x401620, static_cast<void(CAnimBlendAssociation::*)(CAnimBlendAssociation&)>(&CAnimBlendAssociation::Init), PATCH_JUMP);
-	MemoryVP::InjectHook(0x4016A0, &CAnimBlendAssociation::AllocateAnimBlendNodeArray, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4016F0, &CAnimBlendAssociation::FreeAnimBlendNodeArray, PATCH_JUMP);
-	MemoryVP::InjectHook(0x401700, &CAnimBlendAssociation::SetCurrentTime, PATCH_JUMP);
-	MemoryVP::InjectHook(0x401780, &CAnimBlendAssociation::SyncAnimation, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4017B0, &CAnimBlendAssociation::GetNode, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4017D0, &CAnimBlendAssociation::Start, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4017E0, &CAnimBlendAssociation::SetBlend, PATCH_JUMP);
-	MemoryVP::InjectHook(0x401800, &CAnimBlendAssociation::SetDeleteCallback, PATCH_JUMP);
-	MemoryVP::InjectHook(0x401820, &CAnimBlendAssociation::SetFinishCallback, PATCH_JUMP);
-	MemoryVP::InjectHook(0x401840, &CAnimBlendAssociation::dtor2, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4031F0, &CAnimBlendAssociation::UpdateTime, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4032B0, &CAnimBlendAssociation::UpdateBlend, PATCH_JUMP);
+	InjectHook(0x401000, &CAnimBlendAssocGroup::ctor, PATCH_JUMP);
+	InjectHook(0x401130, static_cast<void(CAnimBlendAssocGroup::*)(const char*)>(&CAnimBlendAssocGroup::CreateAssociations), PATCH_JUMP);
+	InjectHook(0x401220, static_cast<void(CAnimBlendAssocGroup::*)(const char *name, RpClump *clump, char **names, int numAnims)>(&CAnimBlendAssocGroup::CreateAssociations), PATCH_JUMP);
+	InjectHook(0x4012D0, &CAnimBlendAssocGroup::dtor, PATCH_JUMP);
+	InjectHook(0x401300, static_cast<CAnimBlendAssociation*(CAnimBlendAssocGroup::*)(const char*)>(&CAnimBlendAssocGroup::GetAnimation), PATCH_JUMP);
+	InjectHook(0x4013D0, static_cast<CAnimBlendAssociation*(CAnimBlendAssocGroup::*)(uint)>(&CAnimBlendAssocGroup::GetAnimation), PATCH_JUMP);
+	InjectHook(0x4013E0, static_cast<CAnimBlendAssociation*(CAnimBlendAssocGroup::*)(const char*)>(&CAnimBlendAssocGroup::CopyAnimation), PATCH_JUMP);
+	InjectHook(0x401420, static_cast<CAnimBlendAssociation*(CAnimBlendAssocGroup::*)(uint)>(&CAnimBlendAssocGroup::CopyAnimation), PATCH_JUMP);
 
-	MemoryVP::InjectHook(0x401880, &CAnimBlendClumpData::ctor, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4018B0, &CAnimBlendClumpData::dtor, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4018F0, &CAnimBlendClumpData::SetNumberOfBones, PATCH_JUMP);
-	MemoryVP::InjectHook(0x401930, &CAnimBlendClumpData::ForAllFrames, PATCH_JUMP);
+	InjectHook(0x401460, &CAnimBlendAssociation::ctor, PATCH_JUMP);
+	InjectHook(0x401520, &CAnimBlendAssociation::dtor, PATCH_JUMP);
+	InjectHook(0x401560, static_cast<void(CAnimBlendAssociation::*)(RpClump *clump, CAnimBlendHierarchy *anim)>(&CAnimBlendAssociation::Init), PATCH_JUMP);
+	InjectHook(0x401620, static_cast<void(CAnimBlendAssociation::*)(CAnimBlendAssociation&)>(&CAnimBlendAssociation::Init), PATCH_JUMP);
+	InjectHook(0x4016A0, &CAnimBlendAssociation::AllocateAnimBlendNodeArray, PATCH_JUMP);
+	InjectHook(0x4016F0, &CAnimBlendAssociation::FreeAnimBlendNodeArray, PATCH_JUMP);
+	InjectHook(0x401700, &CAnimBlendAssociation::SetCurrentTime, PATCH_JUMP);
+	InjectHook(0x401780, &CAnimBlendAssociation::SyncAnimation, PATCH_JUMP);
+	InjectHook(0x4017B0, &CAnimBlendAssociation::GetNode, PATCH_JUMP);
+	InjectHook(0x4017D0, &CAnimBlendAssociation::Start, PATCH_JUMP);
+	InjectHook(0x4017E0, &CAnimBlendAssociation::SetBlend, PATCH_JUMP);
+	InjectHook(0x401800, &CAnimBlendAssociation::SetDeleteCallback, PATCH_JUMP);
+	InjectHook(0x401820, &CAnimBlendAssociation::SetFinishCallback, PATCH_JUMP);
+	InjectHook(0x401840, &CAnimBlendAssociation::dtor2, PATCH_JUMP);
+	InjectHook(0x4031F0, &CAnimBlendAssociation::UpdateTime, PATCH_JUMP);
+	InjectHook(0x4032B0, &CAnimBlendAssociation::UpdateBlend, PATCH_JUMP);
 
-	MemoryVP::InjectHook(0x4019A0, &CAnimBlendHierarchy::Shutdown, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4019C0, &CAnimBlendHierarchy::SetName, PATCH_JUMP);
-	MemoryVP::InjectHook(0x401AB0, &CAnimBlendHierarchy::RemoveAnimSequences, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4019E0, &CAnimBlendHierarchy::CalcTotalTime, PATCH_JUMP);
-	MemoryVP::InjectHook(0x401A80, &CAnimBlendHierarchy::RemoveQuaternionFlips, PATCH_JUMP);
-	MemoryVP::InjectHook(0x401AD0, &CAnimBlendHierarchy::Uncompress, PATCH_JUMP);
-	MemoryVP::InjectHook(0x401B00, &CAnimBlendHierarchy::RemoveUncompressedData, PATCH_JUMP);
+	InjectHook(0x401880, &CAnimBlendClumpData::ctor, PATCH_JUMP);
+	InjectHook(0x4018B0, &CAnimBlendClumpData::dtor, PATCH_JUMP);
+	InjectHook(0x4018F0, &CAnimBlendClumpData::SetNumberOfBones, PATCH_JUMP);
+	InjectHook(0x401930, &CAnimBlendClumpData::ForAllFrames, PATCH_JUMP);
 
-	MemoryVP::InjectHook(0x401B10, &CAnimBlendNode::Init, PATCH_JUMP);
-	MemoryVP::InjectHook(0x401B30, &CAnimBlendNode::Update, PATCH_JUMP);
-	MemoryVP::InjectHook(0x401DC0, &CAnimBlendNode::NextKeyFrame, PATCH_JUMP);
-	MemoryVP::InjectHook(0x401E70, &CAnimBlendNode::CalcDeltas, PATCH_JUMP);
-	MemoryVP::InjectHook(0x401FE0, &CAnimBlendNode::GetCurrentTranslation, PATCH_JUMP);
-	MemoryVP::InjectHook(0x402110, &CAnimBlendNode::GetEndTranslation, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4021B0, &CAnimBlendNode::FindKeyFrame, PATCH_JUMP);
+	InjectHook(0x4019A0, &CAnimBlendHierarchy::Shutdown, PATCH_JUMP);
+	InjectHook(0x4019C0, &CAnimBlendHierarchy::SetName, PATCH_JUMP);
+	InjectHook(0x401AB0, &CAnimBlendHierarchy::RemoveAnimSequences, PATCH_JUMP);
+	InjectHook(0x4019E0, &CAnimBlendHierarchy::CalcTotalTime, PATCH_JUMP);
+	InjectHook(0x401A80, &CAnimBlendHierarchy::RemoveQuaternionFlips, PATCH_JUMP);
+	InjectHook(0x401AD0, &CAnimBlendHierarchy::Uncompress, PATCH_JUMP);
+	InjectHook(0x401B00, &CAnimBlendHierarchy::RemoveUncompressedData, PATCH_JUMP);
 
-	MemoryVP::InjectHook(0x4022D0, &CAnimBlendSequence::ctor, PATCH_JUMP);
-	MemoryVP::InjectHook(0x402300, &CAnimBlendSequence::dtor, PATCH_JUMP);
-	MemoryVP::InjectHook(0x402330, &CAnimBlendSequence::SetName, PATCH_JUMP);
-	MemoryVP::InjectHook(0x402350, &CAnimBlendSequence::SetNumFrames, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4023A0, &CAnimBlendSequence::RemoveQuaternionFlips, PATCH_JUMP);
-	MemoryVP::InjectHook(0x402470, &CAnimBlendSequence::dtor2, PATCH_JUMP);
+	InjectHook(0x401B10, &CAnimBlendNode::Init, PATCH_JUMP);
+	InjectHook(0x401B30, &CAnimBlendNode::Update, PATCH_JUMP);
+	InjectHook(0x401DC0, &CAnimBlendNode::NextKeyFrame, PATCH_JUMP);
+	InjectHook(0x401E70, &CAnimBlendNode::CalcDeltas, PATCH_JUMP);
+	InjectHook(0x401FE0, &CAnimBlendNode::GetCurrentTranslation, PATCH_JUMP);
+	InjectHook(0x402110, &CAnimBlendNode::GetEndTranslation, PATCH_JUMP);
+	InjectHook(0x4021B0, &CAnimBlendNode::FindKeyFrame, PATCH_JUMP);
 
-	MemoryVP::InjectHook(0x403380, CAnimManager::Initialise, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4033B0, CAnimManager::Shutdown, PATCH_JUMP);
-	MemoryVP::InjectHook(0x403410, CAnimManager::UncompressAnimation, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4034A0, CAnimManager::GetAnimationBlock, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4034F0, CAnimManager::GetAnimation, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4035B0, CAnimManager::GetAnimGroupName, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4035C0, CAnimManager::CreateAnimAssociation, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4035E0, (CAnimBlendAssociation *(*)(int, int))CAnimManager::GetAnimAssociation, PATCH_JUMP);
-	MemoryVP::InjectHook(0x403600, (CAnimBlendAssociation *(*)(int, const char*))CAnimManager::GetAnimAssociation, PATCH_JUMP);
-	MemoryVP::InjectHook(0x403620, CAnimManager::AddAnimation, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4036A0, CAnimManager::AddAnimationAndSync, PATCH_JUMP);
-	MemoryVP::InjectHook(0x403710, CAnimManager::BlendAnimation, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4038F0, CAnimManager::LoadAnimFiles, PATCH_JUMP);
-	MemoryVP::InjectHook(0x403A10, (void (*)(const char*))CAnimManager::LoadAnimFile, PATCH_JUMP);
-	MemoryVP::InjectHook(0x403A40, (void (*)(int, bool))CAnimManager::LoadAnimFile, PATCH_JUMP);
-	MemoryVP::InjectHook(0x404320, CAnimManager::RemoveLastAnimFile, PATCH_JUMP);
+	InjectHook(0x4022D0, &CAnimBlendSequence::ctor, PATCH_JUMP);
+	InjectHook(0x402300, &CAnimBlendSequence::dtor, PATCH_JUMP);
+	InjectHook(0x402330, &CAnimBlendSequence::SetName, PATCH_JUMP);
+	InjectHook(0x402350, &CAnimBlendSequence::SetNumFrames, PATCH_JUMP);
+	InjectHook(0x4023A0, &CAnimBlendSequence::RemoveQuaternionFlips, PATCH_JUMP);
+	InjectHook(0x402470, &CAnimBlendSequence::dtor2, PATCH_JUMP);
 
-	MemoryVP::InjectHook(0x4024B0, RpAnimBlendClumpUpdateAnimations, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4031B0, (CAnimBlendAssociation *(*)(RpClump*))RpAnimBlendClumpGetFirstAssociation, PATCH_JUMP);
-	MemoryVP::InjectHook(0x405240, AnimBlendClumpDestroy, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4052A0, RpAnimBlendAllocateData, PATCH_JUMP);
-	MemoryVP::InjectHook(0x405430, RpAnimBlendClumpFindFrame, PATCH_JUMP);
-	MemoryVP::InjectHook(0x405460, RpAnimBlendClumpFillFrameArray, PATCH_JUMP);
-	MemoryVP::InjectHook(0x405480, RpAnimBlendClumpInit, PATCH_JUMP);
-	MemoryVP::InjectHook(0x405500, RpAnimBlendClumpIsInitialized, PATCH_JUMP);
-	MemoryVP::InjectHook(0x405520, RpAnimBlendClumpSetBlendDeltas, PATCH_JUMP);
-	MemoryVP::InjectHook(0x405560, RpAnimBlendClumpRemoveAllAssociations, PATCH_JUMP);
-	MemoryVP::InjectHook(0x405570, RpAnimBlendClumpRemoveAssociations, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4055C0, RpAnimBlendClumpGetAssociation, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4055F0, RpAnimBlendClumpGetMainAssociation, PATCH_JUMP);
-	MemoryVP::InjectHook(0x405680, RpAnimBlendClumpGetMainPartialAssociation, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4056D0, RpAnimBlendClumpGetMainAssociation_N, PATCH_JUMP);
-	MemoryVP::InjectHook(0x405710, RpAnimBlendClumpGetMainPartialAssociation_N, PATCH_JUMP);
-	MemoryVP::InjectHook(0x405750, (CAnimBlendAssociation *(*)(RpClump*, uint))RpAnimBlendClumpGetFirstAssociation, PATCH_JUMP);
-	MemoryVP::InjectHook(0x405780, (CAnimBlendAssociation *(*)(CAnimBlendAssociation*))RpAnimBlendGetNextAssociation, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4057A0, (CAnimBlendAssociation *(*)(CAnimBlendAssociation*, uint))RpAnimBlendGetNextAssociation, PATCH_JUMP);
+	InjectHook(0x403380, CAnimManager::Initialise, PATCH_JUMP);
+	InjectHook(0x4033B0, CAnimManager::Shutdown, PATCH_JUMP);
+	InjectHook(0x403410, CAnimManager::UncompressAnimation, PATCH_JUMP);
+	InjectHook(0x4034A0, CAnimManager::GetAnimationBlock, PATCH_JUMP);
+	InjectHook(0x4034F0, CAnimManager::GetAnimation, PATCH_JUMP);
+	InjectHook(0x4035B0, CAnimManager::GetAnimGroupName, PATCH_JUMP);
+	InjectHook(0x4035C0, CAnimManager::CreateAnimAssociation, PATCH_JUMP);
+	InjectHook(0x4035E0, (CAnimBlendAssociation *(*)(int, int))CAnimManager::GetAnimAssociation, PATCH_JUMP);
+	InjectHook(0x403600, (CAnimBlendAssociation *(*)(int, const char*))CAnimManager::GetAnimAssociation, PATCH_JUMP);
+	InjectHook(0x403620, CAnimManager::AddAnimation, PATCH_JUMP);
+	InjectHook(0x4036A0, CAnimManager::AddAnimationAndSync, PATCH_JUMP);
+	InjectHook(0x403710, CAnimManager::BlendAnimation, PATCH_JUMP);
+	InjectHook(0x4038F0, CAnimManager::LoadAnimFiles, PATCH_JUMP);
+	InjectHook(0x403A10, (void (*)(const char*))CAnimManager::LoadAnimFile, PATCH_JUMP);
+	InjectHook(0x403A40, (void (*)(int, bool))CAnimManager::LoadAnimFile, PATCH_JUMP);
+	InjectHook(0x404320, CAnimManager::RemoveLastAnimFile, PATCH_JUMP);
 
-	MemoryVP::InjectHook(0x4F8920, &CClumpModelInfo::CreateInstance, PATCH_JUMP);
-	MemoryVP::InjectHook(0x4F8830, &CClumpModelInfo::SetClump, PATCH_JUMP);
-	MemoryVP::InjectHook(0x510210, &CPedModelInfo::SetClump, PATCH_JUMP);
-	MemoryVP::InjectHook(0x473FC6, &DeleteRwObject_hook);
-	MemoryVP::InjectHook(0x50BAD0, &CModelInfo::AddPedModel, PATCH_JUMP);
-	MemoryVP::Patch(0x5FE004, &CPedModelInfo::DeleteRwObject);
+	InjectHook(0x4024B0, RpAnimBlendClumpUpdateAnimations, PATCH_JUMP);
+	InjectHook(0x4031B0, (CAnimBlendAssociation *(*)(RpClump*))RpAnimBlendClumpGetFirstAssociation, PATCH_JUMP);
+	InjectHook(0x405240, AnimBlendClumpDestroy, PATCH_JUMP);
+	InjectHook(0x4052A0, RpAnimBlendAllocateData, PATCH_JUMP);
+	InjectHook(0x405430, RpAnimBlendClumpFindFrame, PATCH_JUMP);
+	InjectHook(0x405460, RpAnimBlendClumpFillFrameArray, PATCH_JUMP);
+	InjectHook(0x405480, RpAnimBlendClumpInit, PATCH_JUMP);
+	InjectHook(0x405500, RpAnimBlendClumpIsInitialized, PATCH_JUMP);
+	InjectHook(0x405520, RpAnimBlendClumpSetBlendDeltas, PATCH_JUMP);
+	InjectHook(0x405560, RpAnimBlendClumpRemoveAllAssociations, PATCH_JUMP);
+	InjectHook(0x405570, RpAnimBlendClumpRemoveAssociations, PATCH_JUMP);
+	InjectHook(0x4055C0, RpAnimBlendClumpGetAssociation, PATCH_JUMP);
+	InjectHook(0x4055F0, RpAnimBlendClumpGetMainAssociation, PATCH_JUMP);
+	InjectHook(0x405680, RpAnimBlendClumpGetMainPartialAssociation, PATCH_JUMP);
+	InjectHook(0x4056D0, RpAnimBlendClumpGetMainAssociation_N, PATCH_JUMP);
+	InjectHook(0x405710, RpAnimBlendClumpGetMainPartialAssociation_N, PATCH_JUMP);
+	InjectHook(0x405750, (CAnimBlendAssociation *(*)(RpClump*, uint))RpAnimBlendClumpGetFirstAssociation, PATCH_JUMP);
+	InjectHook(0x405780, (CAnimBlendAssociation *(*)(CAnimBlendAssociation*))RpAnimBlendGetNextAssociation, PATCH_JUMP);
+	InjectHook(0x4057A0, (CAnimBlendAssociation *(*)(CAnimBlendAssociation*, uint))RpAnimBlendGetNextAssociation, PATCH_JUMP);
+
+	InjectHook(0x4F8920, &CClumpModelInfo::CreateInstance, PATCH_JUMP);
+	InjectHook(0x4F8830, &CClumpModelInfo::SetClump, PATCH_JUMP);
+	InjectHook(0x510210, &CPedModelInfo::SetClump, PATCH_JUMP);
+	InjectHook(0x473FC6, &DeleteRwObject_hook);
+	InjectHook(0x50BAD0, &CModelInfo::AddPedModel, PATCH_JUMP);
+	Patch(0x5FE004, &CPedModelInfo::DeleteRwObject);
 
 	// patch CModelInfo::ShutDown() instead of rewriting that weird code
-	MemoryVP::Patch(0x50B6EC, &CModelInfo::ms_pedModelStore);
-	MemoryVP::Patch(0x50B6F4, &CModelInfo::ms_pedModelStore);
-	MemoryVP::Patch(0x50B70B, &CModelInfo::ms_pedModelStore);
-	MemoryVP::Patch(0x50B708, (BYTE)sizeof(CPedModelInfo));
+	Patch(0x50B3B9+2, &CModelInfo::ms_pedModelStore);
+	Patch(0x50B6EC, &CModelInfo::ms_pedModelStore);
+	Patch(0x50B6F4, &CModelInfo::ms_pedModelStore);
+	Patch(0x50B70B, &CModelInfo::ms_pedModelStore);
+	Patch(0x50B708, (BYTE)sizeof(CPedModelInfo));
+
+	InterceptCall(&InitialiseGame, InitialiseGame_hook, 0x582E6C);
 
 	// bat FX
-	MemoryVP::Nop(0x518DB6, 5);
+	Nop(0x518DB6, 5);
 	// flying limbs
-	MemoryVP::Nop(0x4EAF17, 2);
+	Nop(0x4EAF17, 2);
 	
 	pedikhooks();
 	pedhooks();
 	objecthooks();
+
+//	hookEntityVtables();
 
 	//dumpAnimGroups();
 

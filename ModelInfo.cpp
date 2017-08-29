@@ -3,7 +3,7 @@
 WRAPPER void CVisibilityPlugins__SetClumpModelInfo(RpClump *clump, int clumpModelInfo) { EAXJMP(0x528ED0); }
 WRAPPER void __fastcall CBaseModelInfo__AddTexDictionaryRef(int self) { EAXJMP(0x4F6B80); }
 WRAPPER void CClumpModelInfo::SetFrameIds(int ids) { EAXJMP(0x4F8BB0); }
-//WRAPPER void __fastcall CPedModelInfo__CreateHitColModel(int self) { EAXJMP(0x5104D0); }
+WRAPPER void __fastcall CPedModelInfo__CreateHitColModel(void *self) { EAXJMP(0x5104D0); }
 WRAPPER void __fastcall CPedModelInfo__DeleteRwObject_orig(CPedModelInfo*) { EAXJMP(0x510280); }
 
 WRAPPER RpAtomic *CVisibilityPlugins__RenderPlayerCB(RpAtomic*) { EAXJMP(0x528B30); }
@@ -127,6 +127,7 @@ CPedModelInfo__findLimbsCb(RpAtomic *atomic, void *data)
 		limbs->pedmodelinfo->rhand = atomic;
 	}else
 		return atomic;
+	AttachRimPipeToRwObject((RwObject*)atomic);
 	RpClumpRemoveAtomic(limbs->clump, atomic);
 	RwFrameRemoveChild(frame);
 	return atomic;
@@ -223,6 +224,7 @@ struct ColLimb
 };
 
 // this is very weird....names and IDs mixed, WHY?
+/*
 ColLimb m_pColNodeInfos[8] = {
 	{ NULL,         PED_Shead,       6,  0.0f,   0.05f, 0.2f },
 	{ "Storso",     0,               0,  0.0f,   0.15f, 0.2f },
@@ -233,8 +235,19 @@ ColLimb m_pColNodeInfos[8] = {
 	{ "Slowerlegl", 0,               4,  0.0f,   0.07f, 0.25f },
 	{ NULL,         PED_Slowerlegr,  5,  0.0f,   0.07f, 0.25f },
 };
+*/
+ColLimb m_pColNodeInfos[8] = {
+	{ NULL,         PED_Shead,       6,  0.0f,   0.05f, 0.2f },
+	{ "Storso",     PED_Storso,      0,  0.0f,   0.15f, 0.2f },
+	{ "Storso",     PED_Storso,      0,  0.0f,  -0.05f, 0.3f },
+	{ NULL,         PED_Storso,      1,  0.0f,  -0.07f, 0.3f },
+	{ NULL,         PED_Supperarml,  2,  0.07f, -0.1f,  0.2f },
+	{ NULL,         PED_Supperarmr,  3, -0.07f, -0.1f,  0.2f },
+	{ "Slowerlegl", PED_Slowerlegl,  4,  0.0f,   0.07f, 0.25f },
+	{ NULL,         PED_Slowerlegr,  5,  0.0f,   0.07f, 0.25f },
+};
 
-//ColLimb *ColLimbs = (ColLimb*)0x5FE848;
+//ColLimb *m_pColNodeInfos = (ColLimb*)0x5FE848;
 
 CColModel*
 CPedModelInfo::AnimatePedColModelSkinned(RpClump *clump)
@@ -268,6 +281,9 @@ CPedModelInfo::AnimatePedColModelSkinned(RpClump *clump)
 }
 
 void
+SkinGetBonePositionsToTable(RpClump *clump, RwV3d *boneTable);
+
+void
 CPedModelInfo::CreateHitColModelSkinned(RpClump *clump)
 {
 	CVector center;
@@ -279,10 +295,12 @@ CPedModelInfo::CreateHitColModelSkinned(RpClump *clump)
 	invmat = RwMatrixCreate();
 	mat = RwMatrixCreate();
 	RwMatrixInvert(invmat, &RpClumpGetFrame(clump)->modelling);
+
 	for(int i = 0; i < 8; i++){
 		*mat = *invmat;
 		int id = ConvertPedNode2BoneTag(m_pColNodeInfos[i].id);	// this is wrong, wtf R* ???
 		int idx = RpHAnimIDGetIndex(hier, id);
+		*mat = RpHAnimHierarchyGetMatrixArray(hier)[idx];
 		RwMatrixTransform(mat, &RpHAnimHierarchyGetMatrixArray(hier)[idx], rwCOMBINEPRECONCAT);
 		RwV3d pos;
 		pos.x = pos.y = pos.z = 0.0f;
@@ -325,6 +343,7 @@ CPedModelInfo::CreateHitColModel(void)
 	RwFrame *root = RpClumpGetFrame(this->clump);
 	RwMatrix *mat = RwMatrixCreate();
 	for(int i = 0; i < 8; i++){
+//		spheres[i].Set(100, &center, 17, 0);
 		if(m_pColNodeInfos[i].name){
 			search.name = m_pColNodeInfos[i].name;
 			search.out = NULL;
@@ -338,15 +357,21 @@ CPedModelInfo::CreateHitColModel(void)
 		if(f){
 			float radius = m_pColNodeInfos[i].radius;
 			if(m_pColNodeInfos[i].flag == 6)
-				RwFrameForAllObjects(root, (RwObjectCallBack)0x5104A0, &radius);	// FindHeadRadiusCB
-			*mat = f->modelling;
-			for(f = RwFrameGetParent(f); f != root; f = RwFrameGetParent(f))
+				RwFrameForAllObjects(f, (RwObjectCallBack)0x5104A0, &radius);	// FindHeadRadiusCB
+			RwMatrixTransform(mat, &f->modelling, rwCOMBINEREPLACE);
+			const char *name = GetFrameNodeName(f);
+			for(f = RwFrameGetParent(f); f; f = RwFrameGetParent(f)){
+				name = GetFrameNodeName(f);
 				RwMatrixTransform(mat, &f->modelling, rwCOMBINEPOSTCONCAT);
+				if(RwFrameGetParent(f) == root)
+					break;
+			}
 			center.x = mat->pos.x + m_pColNodeInfos[i].x;
 			center.y = mat->pos.y + 0.0f;
 			center.z = mat->pos.z + m_pColNodeInfos[i].z;
 			spheres[i].Set(radius, &center, 17, m_pColNodeInfos[i].flag);
-		}
+		}else
+			assert(0);
 	}
 	RwMatrixDestroy(mat);
 	colmodel->spheres = spheres;

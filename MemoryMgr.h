@@ -17,119 +17,138 @@ enum
 	PATCH_NOTHING,
 };
 
-template<typename AT>
-inline AT DynBaseAddress(AT address)
+enum
 {
-	return (AT)GetModuleHandle(nullptr) - 0x400000 + address;
+	III_10 = 1,
+	III_11,
+	III_STEAM,
+	VC_10,
+	VC_11,
+	VC_STEAM
+};
+
+extern int gtaversion;
+
+template<typename T>
+inline T AddressByVersion(addr addressIII10, addr addressIII11, addr addressIIISteam, addr addressvc10, addr addressvc11, addr addressvcSteam)
+{
+	if(gtaversion == -1){
+		     if(*(addr*)0x5C1E75 == 0xB85548EC) gtaversion = III_10;
+		else if(*(addr*)0x5C2135 == 0xB85548EC) gtaversion = III_11;
+		else if(*(addr*)0x5C6FD5 == 0xB85548EC) gtaversion = III_STEAM;
+		else if(*(addr*)0x667BF5 == 0xB85548EC) gtaversion = VC_10;
+		else if(*(addr*)0x667C45 == 0xB85548EC) gtaversion = VC_11;
+		else if(*(addr*)0x666BA5 == 0xB85548EC) gtaversion = VC_STEAM;
+		else gtaversion = 0;
+	}
+	switch(gtaversion){
+	case III_10:
+		return (T)addressIII10;
+	case III_11:
+		return (T)addressIII11;
+	case III_STEAM:
+		return (T)addressIIISteam;
+	case VC_10:
+		return (T)addressvc10;
+	case VC_11:
+		return (T)addressvc11;
+	case VC_STEAM:
+		return (T)addressvcSteam;
+	default:
+		return (T)0;
+	}
 }
 
-namespace Memory
+inline bool
+is10(void)
 {
-	template<typename T, typename AT>
-	inline void		Patch(AT address, T value)
-	{*(T*)address = value; }
+	return gtaversion == III_10 || gtaversion == VC_10;
+}
 
-	template<typename AT>
-	inline void		Nop(AT address, unsigned int nCount)
-	// TODO: Finish multibyte nops
-	{ memset((void*)address, 0x90, nCount); }
-
-	template<typename AT, typename HT>
-	inline void		InjectHook(AT address, HT hook, unsigned int nType=PATCH_NOTHING)
-	{
-		DWORD		dwHook;
-		_asm
-		{
-			mov		eax, hook
-			mov		dwHook, eax
-		}
-
-		switch ( nType )
-		{
-		case PATCH_JUMP:
-			*(BYTE*)address = 0xE9;
-			break;
-		case PATCH_CALL:
-			*(BYTE*)address = 0xE8;
-			break;
-		}
-
-		*(ptrdiff_t*)((DWORD)address + 1) = dwHook - (DWORD)address - 5;
-	}
-};
-
-namespace MemoryVP
+inline bool
+isIII(void)
 {
-	template<typename T, typename AT>
-	inline void		Patch(AT address, T value)
+	return gtaversion >= III_10 && gtaversion <= III_STEAM;
+}
+
+inline bool
+isVC(void)
+{
+	return gtaversion >= VC_10 && gtaversion <= VC_STEAM;
+}
+
+#define PTRFROMCALL(addr) (uint32_t)(*(uint32_t*)((uint32_t)addr+1) + (uint32_t)addr + 5)
+#define INTERCEPT(saved, func, a) \
+{ \
+	saved = PTRFROMCALL(a); \
+	InjectHook(a, func); \
+}
+
+template<typename T, typename AT> inline void
+Patch(AT address, T value)
+{
+	DWORD		dwProtect[2];
+	VirtualProtect((void*)address, sizeof(T), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+	*(T*)address = value;
+	VirtualProtect((void*)address, sizeof(T), dwProtect[0], &dwProtect[1]);
+}
+
+template<typename AT> inline void
+Nop(AT address, unsigned int nCount)
+{
+	DWORD		dwProtect[2];
+	VirtualProtect((void*)address, nCount, PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+	memset((void*)address, 0x90, nCount);
+	VirtualProtect((void*)address, nCount, dwProtect[0], &dwProtect[1]);
+}
+
+template<typename AT, typename HT> inline void
+InjectHook(AT address, HT hook, unsigned int nType=PATCH_NOTHING)
+{
+	DWORD		dwProtect[2];
+	switch ( nType )
 	{
-		DWORD		dwProtect[2];
-		VirtualProtect((void*)address, sizeof(T), PAGE_EXECUTE_READWRITE, &dwProtect[0]);
-		*(T*)address = value;
-		VirtualProtect((void*)address, sizeof(T), dwProtect[0], &dwProtect[1]);
+	case PATCH_JUMP:
+		VirtualProtect((void*)address, 5, PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+		*(BYTE*)address = 0xE9;
+		break;
+	case PATCH_CALL:
+		VirtualProtect((void*)address, 5, PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+		*(BYTE*)address = 0xE8;
+		break;
+	default:
+		VirtualProtect((void*)((DWORD)address + 1), 4, PAGE_EXECUTE_READWRITE, &dwProtect[0]);
+		break;
+	}
+	DWORD		dwHook;
+	_asm
+	{
+		mov		eax, hook
+		mov		dwHook, eax
 	}
 
-	template<typename AT>
-	inline void		Nop(AT address, unsigned int nCount)
-	{
-		DWORD		dwProtect[2];
-		VirtualProtect((void*)address, nCount, PAGE_EXECUTE_READWRITE, &dwProtect[0]);
-		memset((void*)address, 0x90, nCount);
-		VirtualProtect((void*)address, nCount, dwProtect[0], &dwProtect[1]);
-	}
+	*(ptrdiff_t*)((DWORD)address + 1) = (DWORD)dwHook - (DWORD)address - 5;
+	if ( nType == PATCH_NOTHING )
+		VirtualProtect((void*)((DWORD)address + 1), 4, dwProtect[0], &dwProtect[1]);
+	else
+		VirtualProtect((void*)address, 5, dwProtect[0], &dwProtect[1]);
+}
 
-	template<typename AT, typename HT>
-	inline void		InjectHook(AT address, HT hook, unsigned int nType=PATCH_NOTHING)
-	{
-		DWORD		dwProtect[2];
-		switch ( nType )
-		{
-		case PATCH_JUMP:
-			VirtualProtect((void*)address, 5, PAGE_EXECUTE_READWRITE, &dwProtect[0]);
-			*(BYTE*)address = 0xE9;
-			break;
-		case PATCH_CALL:
-			VirtualProtect((void*)address, 5, PAGE_EXECUTE_READWRITE, &dwProtect[0]);
-			*(BYTE*)address = 0xE8;
-			break;
-		default:
-			VirtualProtect((void*)((DWORD)address + 1), 4, PAGE_EXECUTE_READWRITE, &dwProtect[0]);
-			break;
-		}
-		DWORD		dwHook;
-		_asm
-		{
-			mov		eax, hook
-			mov		dwHook, eax
-		}
-
-		*(ptrdiff_t*)((DWORD)address + 1) = (DWORD)dwHook - (DWORD)address - 5;
-		if ( nType == PATCH_NOTHING )
-			VirtualProtect((void*)((DWORD)address + 1), 4, dwProtect[0], &dwProtect[1]);
-		else
-			VirtualProtect((void*)address, 5, dwProtect[0], &dwProtect[1]);
-	}
-
-	namespace DynBase
-	{
-		template<typename T, typename AT>
-		inline void		Patch(AT address, T value)
-		{
-			MemoryVP::Patch(DynBaseAddress(address), value);
-		}
-
-		template<typename AT>
-		inline void		Nop(AT address, unsigned int nCount)
-		{
-			MemoryVP::Nop(DynBaseAddress(address), nCount);
-		}
-
-		template<typename AT, typename HT>
-		inline void		InjectHook(AT address, HT hook, unsigned int nType=PATCH_NOTHING)
-		{
-			MemoryVP::InjectHook(DynBaseAddress(address), hook, nType);
-		}
-	};
-};
+inline void ExtractCall(void *dst, addr a)
+{
+	*(addr*)dst = (addr)(*(addr*)(a+1) + a + 5);
+}
+template<typename T>
+inline void InterceptCall(void *dst, T func, addr a)
+{
+	ExtractCall(dst, a);
+	InjectHook(a, func);
+}
+template<typename T>
+inline void InterceptVmethod(void *dst, T func, addr a)
+{
+	*(addr*)dst = *(addr*)a;
+	Patch(a, func);
+}
 
 #endif

@@ -186,12 +186,12 @@ CCutsceneHead::Render(void)
 void
 objecthooks(void)
 {
-	MemoryVP::InjectHook(0x404CA6, &CCutsceneObject::ctor);
-	MemoryVP::InjectHook(0x4BA5EC, &CCutsceneObject::ctor);
-	MemoryVP::Patch(0x5F7CA0, &CCutsceneObject::ProcessControl);
-	MemoryVP::Patch(0x5F7CB4, &CCutsceneObject::Render);
+	InjectHook(0x404CA6, &CCutsceneObject::ctor);
+	InjectHook(0x4BA5EC, &CCutsceneObject::ctor);
+	Patch(0x5F7CA0, &CCutsceneObject::ProcessControl);
+	Patch(0x5F7CB4, &CCutsceneObject::Render);
 
-	MemoryVP::InjectHook(0x404CE8, &CCutsceneHead::ctor);
-	MemoryVP::Patch(0x5F7C28, &CCutsceneHead::ProcessControl);
-	MemoryVP::Patch(0x5F7C3C, &CCutsceneHead::Render);
+	InjectHook(0x404CE8, &CCutsceneHead::ctor);
+	Patch(0x5F7C28, &CCutsceneHead::ProcessControl);
+	Patch(0x5F7C3C, &CCutsceneHead::Render);
 }

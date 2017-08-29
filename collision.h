@@ -74,3 +74,5 @@ struct CColModel
 
 	void ctor(void);
 };
+
+void renderCol(CColModel *col, CMatrix *matrix);

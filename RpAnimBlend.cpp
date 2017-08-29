@@ -231,8 +231,8 @@ SkinGetBonePositionsToTable(RpClump *clump, RwV3d *boneTable)
 	if(boneTable == NULL)
 		return;
 
-	RpAtomic *atomic = GetFirstAtomic(clump);		// mobile
-//	RpAtomic *atomic = IsClumpSkinned(clump);		// xbox
+//	RpAtomic *atomic = GetFirstAtomic(clump);		// mobile
+	RpAtomic *atomic = IsClumpSkinned(clump);		// xbox
 	RpSkin *skin = RpSkinGeometryGetSkin(atomic->geometry);
 	RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(clump);
 	boneTable[0].x = boneTable[0].y = boneTable[0].z = 0.0f;
