@@ -132,16 +132,33 @@ dumpAnimGroups(void)
 void AttachRimPipeToRwObject_dummy(RwObject*){}
 void (*AttachRimPipeToRwObject)(RwObject *obj) = AttachRimPipeToRwObject_dummy;
 
+typedef struct CColModel *( __cdecl *t_GetPedColModel)(struct CPed *ped);
+t_GetPedColModel Original_GetPedColModel;
+
 void (*InitialiseGame)(void);
 void
 InitialiseGame_hook(void)
 {
-	HMODULE sky = GetModuleHandleA("skygfx.asi");
+	HMODULE sky = GetModuleHandleA("skygfx.dll");
+	if(sky == NULL) sky = GetModuleHandleA("skygfx.asi");
 	if(sky){
 		AttachRimPipeToRwObject = (void (*)(RwObject*))GetProcAddress(sky, "AttachRimPipeToRwObject");
 		if(AttachRimPipeToRwObject == NULL)
 			AttachRimPipeToRwObject = AttachRimPipeToRwObject_dummy;
 	}
+
+	HMODULE tyres = GetModuleHandleA("IIIBurstableTyres.dll");
+	if(tyres == NULL) tyres = GetModuleHandleA("IIIBurstableTyres.asi");
+	if(tyres){
+		t_GetPedColModel (__cdecl *Get_GetPedColModel_CallBack)(void) = (t_GetPedColModel (__cdecl *)(void))GetProcAddress(tyres, "?Get_GetPedColModel_CallBack@BurstableTyres@@YAP6APAVCColModel@@PAVCPed@@@ZXZ");
+		void (__cdecl *Set_GetPedColModel_CallBack)(t_GetPedColModel) = (void (__cdecl *)(t_GetPedColModel))GetProcAddress(tyres, "?Set_GetPedColModel_CallBack@BurstableTyres@@YAXP6APAVCColModel@@PAVCPed@@@Z@Z");
+		if ( Get_GetPedColModel_CallBack != NULL && Set_GetPedColModel_CallBack != NULL ){
+			Original_GetPedColModel = Get_GetPedColModel_CallBack();
+			extern struct CColModel *GetPedColModel(struct CPed *ped);
+			Set_GetPedColModel_CallBack(GetPedColModel);
+		}
+	}
+
 	InitialiseGame();
 }
 

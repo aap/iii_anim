@@ -229,11 +229,23 @@ CalculateNewVelocity(void)
 	CPedIK::LimbOrientation *orient = (CPedIK::LimbOrientation*)(frameptr-0x10);
 
 	if(IsClumpSkinned(ped->clump)){
+		/*
 		orient->theta = RAD2DEG(orient->phi);
 		RwV3d axis = { -1.0f, 0.0f, 0.0f };
 		RtQuatRotate(&ped->frames[7]->hanimframe->q, &axis, orient->theta, rwCOMBINEPRECONCAT);
 		RtQuatRotate(&ped->frames[8]->hanimframe->q, &axis, orient->theta, rwCOMBINEPRECONCAT);
 		ped->bfFlagsI |= 0x20;
+		*/
+
+		orient->theta = RAD2DEG(orient->phi);
+		RwV3d axis1 = { 1.0f, 0.0f, 0.0f };
+		RwV3d axis2 = { 0.0f, 0.0f, 1.0f };
+		RtQuatRotate(&ped->frames[7]->hanimframe->q, &axis2, RAD2DEG(0.1f), rwCOMBINEPOSTCONCAT);
+		RtQuatRotate(&ped->frames[7]->hanimframe->q, &axis1, orient->theta, rwCOMBINEPOSTCONCAT);
+		RtQuatRotate(&ped->frames[8]->hanimframe->q, &axis2, RAD2DEG(0.1f), rwCOMBINEPOSTCONCAT);
+		RtQuatRotate(&ped->frames[8]->hanimframe->q, &axis1, orient->theta, rwCOMBINEPOSTCONCAT);
+		ped->bfFlagsI |= 0x20;
+
 	}else{
 		orient->theta = 0.0f;
 		ped->pedIK.RotateTorso(ped->frames[7], orient, 0);
@@ -618,6 +630,17 @@ FightStrike_hook(void)
 		mov	eax, 83D408h[ecx*4]
 		mov	dword ptr [esp], 4E9017h
 		retn
+	}
+}
+
+CColModel*
+GetPedColModel(CPed *ped)
+{
+	if(IsClumpSkinned(ped->clump))
+		return ((CPedModelInfo *)CModelInfo::ms_modelInfoPtrs[ped->nModelIndex])->AnimatePedColModelSkinned(ped->clump);
+	else{
+		extern CColModel *( __cdecl *Original_GetPedColModel)(CPed *ped);
+		return Original_GetPedColModel(ped);
 	}
 }
 
