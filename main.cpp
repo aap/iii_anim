@@ -76,7 +76,7 @@ gtastrcmp(const char *s1, const char *s2)
 		if(c1 != c2)
 			return 1;
 	}
-	return 0;
+	return *s2 != '\0';
 }
 
 int
