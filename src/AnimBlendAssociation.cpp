@@ -1,4 +1,5 @@
 #include "iii_anim.h"
+#include <float.h>
 
 int &CAnimBlendAssociation_VTable = *(int*)0x5EA02C;
 
@@ -197,7 +198,7 @@ bool
 CAnimBlendAssociation::UpdateBlend(float timeDelta)
 {
 	this->blendAmount += this->blendDelta * timeDelta;
-	if(isnan(this->blendAmount) || this->blendAmount > 0.0f || this->blendDelta >= 0.0f)
+	if(_isnan(this->blendAmount) || this->blendAmount > 0.0f || this->blendDelta >= 0.0f)
 		goto xyz;
 	this->blendAmount = 0.0f;
 	if(this->blendDelta < 0.0f)

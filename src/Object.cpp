@@ -25,6 +25,7 @@ CCutsceneObject::ObjectExt CCutsceneObject::objectExt[450];
 //
 
 WRAPPER void CCutsceneObject::ctor_orig(void) { EAXJMP(0x4BA910); }
+WRAPPER void CCutsceneObject::dtor(void) { EAXJMP(0x4BA960); }
 WRAPPER void CCutsceneObject::ProcessControl_orig(void) { EAXJMP(0x4BA9C0); }
 
 CCutsceneObject*
@@ -56,8 +57,29 @@ CCutsceneObject::Render(void)
 			this->RenderLimb(BONE_SRhand);
 		if(this->GetRenderHead())
 			this->RenderLimb(BONE_Shead);
+
 	}
 	((CObject*)this)->Render();
+}
+
+static RpMaterial *MaterialSetAlpha(RpMaterial *material, void *data)
+{
+	RwUInt8 alpha = ((RwUInt8 )data);
+    RpMaterialGetColor(material)->alpha = alpha;
+	return material;
+}
+
+void
+CCutsceneObject::PreRender(void)
+{
+	((void(__thiscall*)(CCutsceneObject*))0x4BAA40)(this);
+
+	if ( nModelIndex >= 0 && nModelIndex <= 89 )
+	{
+		RpGeometry *geometry = RpAtomicGetGeometry(GetFirstAtomic(clump));
+		RpGeometrySetFlags(geometry, RpGeometryGetFlags(geometry) | rxGEOMETRY_MODULATE);
+		RpGeometryForAllMaterials(geometry, MaterialSetAlpha, (void *)255);
+	}
 }
 
 void
@@ -190,6 +212,9 @@ objecthooks(void)
 	InjectHook(0x4BA5EC, &CCutsceneObject::ctor);
 	Patch(0x5F7CA0, &CCutsceneObject::ProcessControl);
 	Patch(0x5F7CB4, &CCutsceneObject::Render);
+
+	Patch(0x5F7CB0, &CCutsceneObject::PreRender);
+	Patch(0x5F7CB0, &CCutsceneObject::PreRender);
 
 	InjectHook(0x404CE8, &CCutsceneHead::ctor);
 	Patch(0x5F7C28, &CCutsceneHead::ProcessControl);

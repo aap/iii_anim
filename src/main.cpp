@@ -12,6 +12,8 @@ WRAPPER void *gta_nw(int) { EAXJMP(0x5A0690); }
 WRAPPER RwMatrix *RwMatrixUpdate(RwMatrix*) { EAXJMP(0x5A28E0); }
 WRAPPER RwMatrix *RwMatrixInvert(RwMatrix*, const RwMatrix*) { EAXJMP(0x5A2C90); }
 WRAPPER RwMatrix *RwMatrixTransform(RwMatrix*, const RwMatrix*, RwOpCombineType) { EAXJMP(0x5A31C0); }
+WRAPPER RwMatrix *RwMatrixTranslate(RwMatrix * matrix, const RwV3d * translation, RwOpCombineType combineOp) { EAXJMP(0x05A3070); }
+WRAPPER RwMatrix *RwMatrixScale(RwMatrix * matrix, const RwV3d * scale, RwOpCombineType combineOp) { EAXJMP(0x5A2EE0); }
 WRAPPER RwMatrix *RwMatrixRotate(RwMatrix*, const RwV3d*, RwReal, RwOpCombineType) { EAXJMP(0x5A2BF0); }
 WRAPPER RwMatrix *RwMatrixCreate(void) { EAXJMP(0x5A3330); }
 WRAPPER RwBool RwMatrixDestroy(RwMatrix*) { EAXJMP(0x5A3300); }
@@ -22,12 +24,14 @@ WRAPPER RwFrame *RwFrameUpdateObjects(RwFrame*) { EAXJMP(0x5A1C60); }
 WRAPPER RwFrame *RwFrameRemoveChild(RwFrame *) { EAXJMP(0x5A1ED0); }
 WRAPPER RwBool RwFrameDestroy(RwFrame*) { EAXJMP(0x5A1A30); }
 WRAPPER RwV3d *RwV3dTransformPoints(RwV3d*, const RwV3d*, RwInt32, const RwMatrix*) { EAXJMP(0x5A37D0); }
+WRAPPER RwV3d *RwV3dTransformVectors(RwV3d * vectorsOut, const RwV3d * vectorsIn, RwInt32 numPoints, const RwMatrix * matrix) { EAXJMP(0x5A37E0); }
 WRAPPER RwReal RwV3dLength(const RwV3d*) { EAXJMP(0x5A36A0); }
 WRAPPER RwBool RpClumpDestroy(RpClump*) { EAXJMP(0x59F500); }
 WRAPPER RpClump *RpClumpForAllAtomics(RpClump*, RpAtomicCallBack, void*) { EAXJMP(0x59EDD0); }
 WRAPPER RpClump *RpClumpClone(RpClump*) { EAXJMP(0x59F1B0); }
 WRAPPER RpClump *RpClumpRemoveAtomic(RpClump*, RpAtomic*) { EAXJMP(0x59F6B0); }
 WRAPPER RpClump *RpClumpAddAtomic(RpClump*, RpAtomic*) { EAXJMP(0x59F680); }
+WRAPPER RpClump *RpClumpStreamRead(RwStream *stream) { EAXJMP(0x59FC50); }
 WRAPPER RwBool RpAtomicDestroy(RpAtomic*) { EAXJMP(0x59F020); }
 WRAPPER RpAtomic *RpAtomicSetFrame(RpAtomic*, RwFrame*) { EAXJMP(0x5A0600); }
 WRAPPER RpSkin *RpSkinGeometryGetSkin(RpGeometry*) { EAXJMP(0x5B1080); }
@@ -37,6 +41,14 @@ WRAPPER RwBool RpHAnimHierarchyUpdateMatrices(RpHAnimHierarchy *hierarchy) { EAX
 WRAPPER RpHAnimHierarchy *RpHAnimFrameGetHierarchy(RwFrame*) { EAXJMP(0x5B11F0); }
 WRAPPER RwBool RpHAnimHierarchySetCurrentAnim(RpHAnimHierarchy*, RpHAnimAnimation*) { EAXJMP(0x5B1200); }
 WRAPPER RwBool RpHAnimHierarchyAddAnimTime(RpHAnimHierarchy*, RwReal) { EAXJMP(0x5B1480); }
+WRAPPER RwBool RpHAnimHierarchySubAnimTime(RpHAnimHierarchy *hierarchy, RwReal time) { EAXJMP(0x5B12B0); }
+WRAPPER RpHAnimAnimation *RpHAnimAnimationStreamRead(RwStream *stream) { EAXJMP(0x5B1C10); }
+WRAPPER RpGeometry *RpGeometryForAllMaterials(RpGeometry *geometry, RpMaterialCallBack fpCallBack, void *pData) { EAXJMP(0x5ACBF0); }
+
+
+WRAPPER RwStream *RwStreamOpen(RwStreamType type, RwStreamAccessType accessType, const void *pData) { EAXJMP(0x5A3FE0); }
+WRAPPER RwBool RwStreamClose(RwStream * stream, void *pData) { EAXJMP(0x5A3F10); }
+WRAPPER RwBool RwStreamFindChunk(RwStream *stream, RwUInt32 type, RwUInt32 *lengthOut, RwUInt32 *versionOut) { EAXJMP(0x5AA540); }
 
 WRAPPER const char *GetFrameNodeName(RwFrame *frame) { EAXJMP(0x527150); }
 WRAPPER void *GetModelFromName(char *name) { EAXJMP(0x4010D0); }
@@ -53,6 +65,9 @@ WRAPPER void CMatrix::RotateX(float) { EAXJMP(0x4B9510); }
 WRAPPER void CMatrix::SetRotateY(float) { EAXJMP(0x4B9340); }
 WRAPPER void CMatrix::SetRotateZ(float) { EAXJMP(0x4B9370); }
 WRAPPER void CMatrix::UpdateRW(void) { EAXJMP(0x4B8EC0); }
+WRAPPER void CMatrix::Update(void) { EAXJMP(0x4B8E50); }
+WRAPPER void CMatrix::AttachRW(RwMatrix *matrix, bool temporary) { EAXJMP(0x4B8E00); }
+WRAPPER void CMatrix::Detach(void) { EAXJMP(0x4B8E30); }
 WRAPPER void CMatrix::mult(CMatrix *out, CMatrix *in1, CMatrix *in2) { EAXJMP(0x4B9D60); }
 WRAPPER void CMatrix::assign(CMatrix *in) { EAXJMP(0x4B8F40); }
 WRAPPER void CVector::Normalize(void) { EAXJMP(0x4BA560); };
@@ -283,15 +298,14 @@ patch10(void)
 	InterceptCall(&InitialiseGame, InitialiseGame_hook, 0x582E6C);
 
 	// bat FX
-	Nop(0x518DB6, 5);
-	// flying limbs
-	Nop(0x4EAF17, 2);
-	
+	extern void CSpecialFX__Update_Patch();
+	InjectHook(0x518D9C, CSpecialFX__Update_Patch, PATCH_CALL);
+	InjectHook(0x518D9C+5, 0x518DBE, PATCH_JUMP);
+
 	pedikhooks();
 	pedhooks();
 	objecthooks();
-
-//	hookEntityVtables();
+	handhooks();
 
 	//dumpAnimGroups();
 
@@ -321,12 +335,12 @@ DllMain(HINSTANCE hInst, DWORD reason, LPVOID)
 {
 	if(reason == DLL_PROCESS_ATTACH){
 		dllModule = hInst;
-
-/*		AllocConsole();
+/*
+		AllocConsole();
 		freopen("CONIN$", "r", stdin);
 		freopen("CONOUT$", "w", stdout);
-		freopen("CONOUT$", "w", stderr);*/
-
+		freopen("CONOUT$", "w", stderr);
+*/
 		GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, (LPCSTR)&DllMain, &hDummyHandle);
 
 		if (*(DWORD*)0x5C1E75 == 0xB85548EC)	// 1.0

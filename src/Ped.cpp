@@ -2,6 +2,13 @@
 
 WRAPPER void CEntity::SetModelIndex(int id) { EAXJMP(0x473E70); }
 WRAPPER void CEntity::Render(void) { EAXJMP(0x474BD0); }
+WRAPPER void CEntity::PreRender(void) { EAXJMP(0x474350); }
+WRAPPER bool CEntity::GetIsOnScreen(void) { EAXJMP(0x474CC0); }
+WRAPPER void CObject::Render(void) { EAXJMP(0x4BB1E0); }
+
+WRAPPER CPed *FindPlayerPed() { EAXJMP(0x4A1150); }
+
+WRAPPER RwObject *LookForBatCB(RwObject *object, void *data) { EAXJMP(0x518BF0); }
 
 int frameptr;
 int otherptr;
@@ -174,6 +181,12 @@ CPed::DoesLOSBulletHitPed(CColPoint *colpoint)
 	return pos.z + 0.2f <= colpoint->point.z ? 0 : 2;
 }
 
+class PedEx : public CPed
+{
+public:
+	void SizeHead();
+};
+
 void __declspec(naked)
 cped_prerender_hook1(void)
 {
@@ -187,7 +200,12 @@ cped_prerender_hook1(void)
 		je	x
 		mov	ecx, [esp+0xC]
 		call	CEntity::UpdateRpHAnim
-	x:	mov	eax, [esp+0xC]
+
+	x:
+		mov	ecx, [esp+0xC]
+		call    PedEx::SizeHead
+
+		mov	eax, [esp+0xC]
 		push	dword ptr 0x4CFE1E
 		retn
 	}
@@ -201,7 +219,7 @@ PreRender2(void)
 	RwV3d *vec = (RwV3d*)(frameptr-0x64);
 	if(IsClumpSkinned(ped->clump)){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(ped->clump);
-		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[10]->nodeID);
+		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[ped->byteBodyPartBleeding]->nodeID);
 		RwV3dTransformPoints(vec, vec, 1, &RpHAnimHierarchyGetMatrixArray(hier)[idx]);
 	}else{
 		for(RwFrame *f = ped->frames[ped->byteBodyPartBleeding]->frame; f; f = (RwFrame *)f->object.parent )
@@ -559,7 +577,7 @@ StartFightDefend(void)
 		pos.x = pos.y = pos.z = 0.0f;
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(ped->clump);
 		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[2]->nodeID);
-		RwV3dTransformPoints(&pos, &pos, 1, &RpHAnimHierarchyGetMatrixArray(hier)[idx]);		
+		RwV3dTransformPoints(&pos, &pos, 1, &RpHAnimHierarchyGetMatrixArray(hier)[idx]);
 		CPedIK::GetWorldMatrix(ped->frames[2]->frame, &mat);
 		for(int i = 0; i < 4; i++){
 			v1.x = pos.x - 0.2f * ped->matrix.matrix.up.x;
@@ -644,6 +662,128 @@ GetPedColModel(CPed *ped)
 	}
 }
 
+void CSpecialFX__Update_Patch()
+{
+	int pedid = CPools__GetPedRef(FindPlayerPed()) >> 8;
+	RpAtomic *atomic = weaponAtomics[pedid];
+
+	LookForBatCB((RwObject *)atomic, (void *)CModelInfo::ms_modelInfoPtrs[172]);
+}
+
+enum tParticleType
+{
+	PARTICLE_BLOOD_SMALL = 0x5,
+	PARTICLE_TEST = 0x41,
+};
+
+WRAPPER void * __cdecl CParticle__AddParticle(tParticleType type, CVector const &vecPos, CVector const &vecDir, CEntity *pEntity, float fSize, int nRotationSpeed, int nRotation, int nCurFrame, int nLifeSpan) { EAXJMP(0x50D140); }
+
+
+void CPed::RemoveBodyPart(int nodeId, signed char a3)
+{
+	if ( frames[nodeId]->frame == NULL )
+	{
+		printf("Trying to remove ped component");
+		return;
+	}
+
+	/*
+	if ( !CGame__nastyGame )
+		return;
+	*/
+	/*
+	if ( nodeId != PED_Shead )
+        CPed::SpawnFlyingComponent(this, nodeId, a3);
+
+	RecurseFrameChildrenVisibilityCB(frames[nodeId]->frame, NULL);
+
+	*/
+
+	/*
+	for ( RwFrame *f = frames[nodeId]->frame; f; f = (RwFrame *)f->object.parent )
+		RwV3dTransformPoints(&point, &point, 1, &f->modelling);
+	*/
+
+	CVector point(0.0f, 0.0f, 0.0f);
+	pedIK.GetComponentPosition((RwV3d *)&point, nodeId);
+
+	if ( GetIsOnScreen() )
+	{
+		CParticle__AddParticle(PARTICLE_TEST, point, CVector(0.0f, 0.0f, 0.0f), 0, 0.1f, 0, 0, 0, 0);
+
+		for ( int i = 0; i < 16; i++ )
+			CParticle__AddParticle(PARTICLE_BLOOD_SMALL, point, CVector(0.0f, 0.0f, 0.029999999f), 0, 0.0f, 0, 0, 0, 0);
+	}
+
+	bfFlagsC = bfFlagsC & 0xDF | 0x20;
+	byteBodyPartBleeding = nodeId;
+}
+
+void PedEx::SizeHead()
+{
+	if ( ((unsigned char)bfFlagsC >> 5) & 1 && byteBodyPartBleeding == PED_Shead )
+	{
+		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(clump);
+		int bonetag = ConvertPedNode2BoneTag(PED_Shead);
+		RwUInt32 index = RpHAnimIDGetIndex(hier, bonetag);
+		RwMatrix *pMatrix = RpHAnimHierarchyGetMatrixArray(hier);
+		RwV3d scale = { 0.0f, 0.0f, 0.0f };
+		RwMatrixScale(&pMatrix[index], &scale, rwCOMBINEPRECONCAT);
+	}
+
+	/*
+	#define ARRAY_SIZE(array)               (sizeof(array) / sizeof(array[0]))
+	if ( ((unsigned char)bfFlagsC >> 5) & 1
+		&& byteBodyPartBleeding == PED_Shead
+		|| byteBodyPartBleeding == PED_Supperlegr
+		|| byteBodyPartBleeding == PED_Supperlegl
+		|| byteBodyPartBleeding == PED_Supperarmr
+		|| byteBodyPartBleeding == PED_Supperarml )
+	{
+		static int head[] = { BONE_Shead };
+
+		static int armL[] = { BONE_SLhand, BONE_Supperarml, BONE_Slowerarml };
+		static int armR[] = { BONE_SRhand, BONE_Supperarmr, BONE_Slowerarmr };
+
+		static int legl[] = { BONE_Sfootl, BONE_Supperlegl, BONE_Slowerlegl };
+		static int legr[] = { BONE_Sfootr, BONE_Supperlegr, BONE_Slowerlegr };
+
+		struct bodypartgroup
+		{
+			int num;
+			int *array;
+		} g[] =
+		{
+			{ 0, NULL },
+			{ 0, NULL },
+			{ ARRAY_SIZE(head), head },
+			{ ARRAY_SIZE(armL), armL },
+			{ ARRAY_SIZE(armR), armR },
+			{ ARRAY_SIZE(armL), armL },
+			{ ARRAY_SIZE(armR), armR },
+			{ ARRAY_SIZE(legl), legl },
+			{ ARRAY_SIZE(legr), legr },
+			{ ARRAY_SIZE(legl), legl },
+			{ ARRAY_SIZE(legr), legr },
+			{ ARRAY_SIZE(legr), legr },
+			{ ARRAY_SIZE(legl), legl }
+		};
+
+
+		for ( int i = 0; i < g[byteBodyPartBleeding].num; i++ )
+		{
+			RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(clump);
+			int bonetag = g[byteBodyPartBleeding].array[i];
+			RwUInt32 index = RpHAnimIDGetIndex(hier, bonetag);
+			RwMatrix *pMatrix = RpHAnimHierarchyGetMatrixArray(hier);
+			RwV3d scale = { 0.0f, 0.0f, 0.0f };
+			RwMatrixScale(&pMatrix[index], &scale, rwCOMBINEPRECONCAT);
+		}
+	}
+	#undef ARRAY_SIZE
+	*/
+}
+
 void
 pedhooks(void)
 {
@@ -686,6 +826,8 @@ pedhooks(void)
 	InjectHook(0x4B0D3A, ProcessLineOfSightSectorList_hook, PATCH_JUMP);
 	//
 	InjectHook(0x4E900C, FightStrike_hook, PATCH_JUMP);
+
+	InjectHook(0x4EAEE0, &CPed::RemoveBodyPart, PATCH_JUMP);
 
 
 

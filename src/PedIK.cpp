@@ -113,7 +113,7 @@ CPedIK::LookInDirection(float phi, float theta)
 		}
 		CMatrix cmat;
 		cmat.ctor(&f->modelling, false);
-		RwV3d pos = cmat.matrix.pos;	
+		RwV3d pos = cmat.matrix.pos;
 		cmat.SetRotateZ(this->headOrient.theta);
 		cmat.RotateX(this->headOrient.phi);
 		cmat.matrix.pos.x += pos.x;
@@ -154,7 +154,7 @@ CPedIK::RestoreLookAt(void)
 		}
 		CMatrix cmat;
 		cmat.ctor(mat, false);
-		RwV3d pos = cmat.matrix.pos;	
+		RwV3d pos = cmat.matrix.pos;
 		cmat.SetRotateZ(this->headOrient.theta);
 		cmat.RotateX(this->headOrient.phi);
 		cmat.matrix.pos.x += pos.x;
