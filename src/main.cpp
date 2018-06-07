@@ -4,6 +4,8 @@ HMODULE dllModule, hDummyHandle;
 
 void **rwengine = *(void***)0x59EEB1;
 
+int &CTimer__m_FrameCounter = *(int*)0x9412EC;
+
 WRAPPER void *RwMallocAlign(uint, int) { EAXJMP(0x526FD0); }
 WRAPPER void RwFreeAlign(void*) { EAXJMP(0x527000); }
 WRAPPER void gtadelete(void*) { EAXJMP(0x5A07E0); }
@@ -45,6 +47,8 @@ WRAPPER RwBool RpHAnimHierarchySubAnimTime(RpHAnimHierarchy *hierarchy, RwReal t
 WRAPPER RpHAnimAnimation *RpHAnimAnimationStreamRead(RwStream *stream) { EAXJMP(0x5B1C10); }
 WRAPPER RpGeometry *RpGeometryForAllMaterials(RpGeometry *geometry, RpMaterialCallBack fpCallBack, void *pData) { EAXJMP(0x5ACBF0); }
 
+WRAPPER RpAtomic *AtomicDefaultRenderCallBack(RpAtomic *atomic) { EAXJMP(0x59E690); }
+
 
 WRAPPER RwStream *RwStreamOpen(RwStreamType type, RwStreamAccessType accessType, const void *pData) { EAXJMP(0x5A3FE0); }
 WRAPPER RwBool RwStreamClose(RwStream * stream, void *pData) { EAXJMP(0x5A3F10); }
@@ -75,6 +79,14 @@ WRAPPER void CrossProduct(CVector *, CVector *, CVector *) { EAXJMP(0x4BA350); }
 
 WRAPPER void CEntity::UpdateRwFrame(void) { EAXJMP(0x474330); }
 WRAPPER void CPhysical::ProcessControl(void) { EAXJMP(0x495F10); }
+
+WRAPPER void CVisibilityPlugins__SetClumpModelInfo(RpClump *clump, int clumpModelInfo) { EAXJMP(0x528ED0); }
+WRAPPER RpAtomic *CVisibilityPlugins__RenderPlayerCB(RpAtomic*) { EAXJMP(0x528B30); }
+WRAPPER void CVisibilityPlugins__RenderAlphaAtomic(RpAtomic*,int) { EAXJMP(0x5280B0); }
+WRAPPER int CVisibilityPlugins__GetClumpAlpha(RpClump* clump) { EAXJMP(0x528F70); }
+//WRAPPER void CVisibilityPlugins__SetClumpAlpha(RpClump* clump, int alpha) { EAXJMP(0x528F50); }
+
+
 
 void **CModelInfo::ms_modelInfoPtrs = (void**)0x83D408;
 
@@ -117,6 +129,7 @@ isSkinnedCb(RpAtomic *atomic, void *data)
 	RpAtomic **ret = (RpAtomic **)data;
 	if(*ret)
 		return NULL;
+	assert(atomic->geometry->object.type = rpGEOMETRY);
 	if(RpSkinGeometryGetSkin(atomic->geometry))
 		*ret = atomic;
 	return atomic;
@@ -126,6 +139,7 @@ RpAtomic*
 IsClumpSkinned(RpClump *c)
 {
 	RpAtomic *ret = NULL;
+	assert(c->object.type == rpCLUMP);
 	RpClumpForAllAtomics(c, isSkinnedCb, &ret);
 	return ret;
 }
@@ -177,9 +191,21 @@ InitialiseGame_hook(void)
 	InitialiseGame();
 }
 
-void hookEntityVtables(void);
-
 RwCamera *&pRwCamera = *(RwCamera**)0x72676C;
+
+
+void __declspec(naked)
+cutscene_copyanimation_hook(void)
+{
+	_asm{	
+		mov	eax,[esp+4]
+		push	ebx	// clump in ebx
+		push	eax	// name from stack
+		// this in ecx
+		call	CAnimBlendAssocGroup::CopyAnimationForClump
+		retn	4
+	}
+}
 
 void
 patch10(void)
@@ -250,7 +276,7 @@ patch10(void)
 	InjectHook(0x4034A0, CAnimManager::GetAnimationBlock, PATCH_JUMP);
 	InjectHook(0x4034F0, CAnimManager::GetAnimation, PATCH_JUMP);
 	InjectHook(0x4035B0, CAnimManager::GetAnimGroupName, PATCH_JUMP);
-	InjectHook(0x4035C0, CAnimManager::CreateAnimAssociation, PATCH_JUMP);
+	InjectHook(0x4035C0, (CAnimBlendAssociation*(*)(int, int))&CAnimManager::CreateAnimAssociation, PATCH_JUMP);
 	InjectHook(0x4035E0, (CAnimBlendAssociation *(*)(int, int))CAnimManager::GetAnimAssociation, PATCH_JUMP);
 	InjectHook(0x403600, (CAnimBlendAssociation *(*)(int, const char*))CAnimManager::GetAnimAssociation, PATCH_JUMP);
 	InjectHook(0x403620, CAnimManager::AddAnimation, PATCH_JUMP);
@@ -301,6 +327,10 @@ patch10(void)
 	extern void CSpecialFX__Update_Patch();
 	InjectHook(0x518D9C, CSpecialFX__Update_Patch, PATCH_CALL);
 	InjectHook(0x518D9C+5, 0x518DBE, PATCH_JUMP);
+
+#ifdef ADAPTHIERARCHY
+	InjectHook(0x404D3A, cutscene_copyanimation_hook);
+#endif
 
 	pedikhooks();
 	pedhooks();

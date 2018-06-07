@@ -114,3 +114,34 @@ CAnimBlendAssocGroup::CopyAnimation(uint i)
 	}
 	return NULL;
 }
+
+#ifdef ADAPTHIERARCHY
+CAnimBlendAssociation*
+CAnimBlendAssocGroup::CopyAnimation(const char *name, RpClump *clump)
+{
+	CAnimBlendAssociation *anim = GetAnimation(name);
+	if(anim){
+		CAnimManager::UncompressAnimation(anim->hierarchy);
+		CAnimBlendAssociation *copy = (CAnimBlendAssociation *)gta_nw(sizeof(CAnimBlendAssociation));
+		if(copy)
+			copy = new (copy) CAnimBlendAssociation(*anim, clump);
+		return copy;
+	}
+	return NULL;
+}
+
+CAnimBlendAssociation*
+CAnimBlendAssocGroup::CopyAnimation(uint i, RpClump *clump)
+{
+	CAnimBlendAssociation *anim;
+	anim = &this->assocList[i];
+	if(anim){
+		CAnimManager::UncompressAnimation(anim->hierarchy);
+		CAnimBlendAssociation *copy = (CAnimBlendAssociation *)gta_nw(sizeof(CAnimBlendAssociation));
+		if(copy)
+			copy = new (copy) CAnimBlendAssociation(*anim, clump);
+		return copy;
+	}
+	return NULL;
+}
+#endif

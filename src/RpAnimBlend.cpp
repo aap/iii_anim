@@ -138,6 +138,25 @@ ConvertBoneTag2BoneName(int tag)
 	return names[tag];
 }
 
+int
+ConvertPedNode2BoneTag(int node)
+{
+	static int tags[] = { BONE_Swaist,
+	                       BONE_Storso,		// this is what Xbox/Mobile use
+	                    //  BONE_Smid,		// this is what PS2/PC use
+	                      BONE_Shead,
+	                      BONE_Supperarml, BONE_Supperarmr,
+	                      BONE_SLhand, BONE_SRhand,
+	                      BONE_Supperlegl, BONE_Supperlegr,
+	                      BONE_Sfootl, BONE_Sfootr,
+	                      BONE_Slowerlegr, BONE_Slowerlegl,
+				// actual fixed nodes for col hit model so we don't depend on PED_TORSO
+	                      BONE_Storso, BONE_Smid };
+	if(node > 14)
+		return -1;
+	return tags[node];
+}
+
 static AnimBlendFrameData *foundFrame;
 
 void
@@ -173,20 +192,6 @@ FillFrameArrayCallback(AnimBlendFrameData *frame, void *arg)
 {
 	AnimBlendFrameData **frames = (AnimBlendFrameData**)arg;
 	frames[CVisibilityPlugins__GetFrameHierarchyId(frame->frame)] = frame;
-}
-
-int
-ConvertPedNode2BoneTag(int node)
-{
-	static int tags[] = { BONE_Swaist, BONE_Storso, BONE_Shead,
-	                      BONE_Supperarml, BONE_Supperarmr,
-	                      BONE_SLhand, BONE_SRhand,
-	                      BONE_Supperlegl, BONE_Supperlegr,
-	                      BONE_Sfootl, BONE_Sfootr,
-	                      BONE_Slowerlegr, BONE_Slowerlegl };
-	if(node > 12)
-		return -1;
-	return tags[node];
 }
 
 void
@@ -233,6 +238,7 @@ SkinGetBonePositionsToTable(RpClump *clump, RwV3d *boneTable)
 
 //	RpAtomic *atomic = GetFirstAtomic(clump);		// mobile
 	RpAtomic *atomic = IsClumpSkinned(clump);		// xbox
+	assert(atomic->geometry->object.type = rpGEOMETRY);
 	RpSkin *skin = RpSkinGeometryGetSkin(atomic->geometry);
 	RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(clump);
 	boneTable[0].x = boneTable[0].y = boneTable[0].z = 0.0f;
@@ -245,9 +251,9 @@ SkinGetBonePositionsToTable(RpClump *clump, RwV3d *boneTable)
 		RwMatrixCopy(&m, &mats[i]);
 		RwMatrixInvert(&invmat, &m);
 		RwV3dTransformPoints(out++, &invmat.pos, 1, &mats[j]);
-		if(hier->pNodeInfo[i].flags & 2)
+		if(hier->pNodeInfo[i].flags & rpHANIMPUSHPARENTMATRIX)
 			stack[++sp] = j;
-		if(hier->pNodeInfo[i].flags & 1)
+		if(hier->pNodeInfo[i].flags & rpHANIMPOPPARENTMATRIX)
 			j = stack[sp--];
 		else
 			j = i;
@@ -267,6 +273,7 @@ RpAnimBlendClumpInitSkinned(RpClump *clump)
 	RpAnimBlendAllocateData(clump);
 	CAnimBlendClumpData *clumpData = *RWPLUGINOFFSET(CAnimBlendClumpData*, clump, ClumpOffset);
 	RpAtomic *atomic = IsClumpSkinned(clump);
+	assert(atomic->geometry->object.type = rpGEOMETRY);
 	RpSkin *skin = RpSkinGeometryGetSkin(atomic->geometry);
 	RwUInt32 numBones = RpSkinGetNumBones(skin);
 	clumpData->SetNumberOfBones(numBones);

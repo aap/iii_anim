@@ -10,6 +10,26 @@ WRAPPER CPed *FindPlayerPed() { EAXJMP(0x4A1150); }
 
 WRAPPER RwObject *LookForBatCB(RwObject *object, void *data) { EAXJMP(0x518BF0); }
 
+WRAPPER int CPools__GetPedRef(CPed *ped) { EAXJMP(0x4A1A80); }
+
+WRAPPER void CPed::SetPedStats(int x) { EAXJMP(0x4C5330); }
+WRAPPER CPed *CPed::ctor_orig(uint type) { EAXJMP(0x4C41C0); }
+WRAPPER void CPed::SpawnFlyingComponent(int nodeId, bool unk) { EAXJMP(0x4EB060); }
+WRAPPER bool CPed::UseGroundColModel(void) { EAXJMP(0x4CE730); }
+
+
+RpAtomic *weaponAtomics[MAXPEDS];
+
+extern "C"
+{
+	__declspec(dllexport) RpAtomic *IIIAnimGetPedWeaponAtomic(CPed *ped)
+	{
+		int pedid = CPools__GetPedRef(ped) >> 8;
+		return weaponAtomics[pedid];
+	}
+}
+
+
 int frameptr;
 int otherptr;
 int thisptr;
@@ -21,12 +41,6 @@ CEntity::UpdateRpHAnim(void)
 	RpHAnimHierarchyUpdateMatrices(hier);
 }
 
-WRAPPER int CPools__GetPedRef(CPed *ped) { EAXJMP(0x4A1A80); }
-
-WRAPPER void CPed::SetPedStats(int x) { EAXJMP(0x4C5330); }
-WRAPPER CPed *CPed::ctor_orig(uint type) { EAXJMP(0x4C41C0); }
-
-RpAtomic *weaponAtomics[140];
 
 CPed*
 CPed::ctor(uint type)
@@ -56,19 +70,26 @@ CPed::SetModelIndex(int id)
 		AttachRimPipeToRwObject((RwObject*)clump);
 }
 
+RpMaterial*
+SetAlphaCB(RpMaterial *material, void *data)
+{
+	material->color.alpha = *(int*)data;
+	return material;
+}
+
 void
 CPed::renderLimb(int node)
 {
 	RpAtomic *atomic;
 	CPedModelInfo *pedinfo = (CPedModelInfo*)CModelInfo::ms_modelInfoPtrs[this->nModelIndex];
 	switch(node){
-	case PED_Shead:
+	case PED_HEAD:
 		atomic = pedinfo->head;
 		break;
-	case PED_SLhand:
+	case PED_HANDL:
 		atomic = pedinfo->lhand;
 		break;
-	case PED_SRhand:
+	case PED_HANDR:
 		atomic = pedinfo->rhand;
 		break;
 	default:
@@ -82,7 +103,8 @@ CPed::renderLimb(int node)
 	RwFrame *frame = RpAtomicGetFrame(atomic);
 	frame->modelling = *mat;
 	RwFrameUpdateObjects(frame);
-	// TODO: set clump alpha
+	int alpha = CVisibilityPlugins__GetClumpAlpha(clump);
+	RpGeometryForAllMaterials(RpAtomicGetGeometry(atomic), SetAlphaCB, &alpha);
 	atomic->renderCallBack(atomic);
 }
 
@@ -92,14 +114,14 @@ cped__render__hook(CPed *ped)
 	ped->CEntity::Render();
 
 	if(IsClumpSkinned(ped->clump)){
-		ped->renderLimb(2);
-		ped->renderLimb(5);
-		ped->renderLimb(6);
+		ped->renderLimb(PED_HEAD);
+		ped->renderLimb(PED_HANDL);
+		ped->renderLimb(PED_HANDR);
 		int pedid = CPools__GetPedRef(ped) >> 8;
 		RpAtomic *atomic = weaponAtomics[pedid];
 		if(atomic){
 			RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(ped->clump);
-			int idx = RpHAnimIDGetIndex(hier, ped->frames[6]->nodeID);
+			int idx = RpHAnimIDGetIndex(hier, ped->frames[PED_HANDR]->nodeID);
 			RwMatrix *mat = &RpHAnimHierarchyGetMatrixArray(hier)[idx];
 			RwFrame *frame = RpAtomicGetFrame(atomic);
 			memcpy(RwFrameGetMatrix(frame), mat, 64);
@@ -123,7 +145,7 @@ CPed::AddWeaponModel(int id)
 			AttachRimPipeToRwObject((RwObject*)atomic);
 	}else{
 		RwFrameDestroy(RpAtomicGetFrame(atomic));
-		RpAtomicSetFrame(atomic, this->frames[6]->frame);
+		RpAtomicSetFrame(atomic, this->frames[PED_HANDR]->frame);
 		RpClumpAddAtomic(this->clump, atomic);
 	}
 	this->weaponModelId = id;
@@ -143,7 +165,7 @@ CPed::RemoveWeaponModel(int id)
 			weaponAtomics[pedid] = NULL;
 		}
 	}else{
-		RwFrameForAllObjects(this->frames[6]->frame, (RwObjectCallBack)0x4CF950, NULL);	// RemoveAllModelCB
+		RwFrameForAllObjects(this->frames[PED_HANDR]->frame, (RwObjectCallBack)0x4CF950, NULL);	// RemoveAllModelCB
 	}
 }
 
@@ -154,10 +176,10 @@ CPed::IsPedHeadAbovePos(float dist)
 	RwV3d vec = { 0.0f, 0.0f, 0.0f };
 	if(IsClumpSkinned(this->clump)){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(this->clump);
-		RwInt32 idx = RpHAnimIDGetIndex(hier, this->frames[2]->nodeID);
+		RwInt32 idx = RpHAnimIDGetIndex(hier, this->frames[PED_HEAD]->nodeID);
 		RwV3dTransformPoints(&vec, &vec, 1, &RpHAnimHierarchyGetMatrixArray(hier)[idx]);
 	}else{
-		CPedIK::GetWorldMatrix(this->frames[2]->frame, &mat);
+		CPedIK::GetWorldMatrix(this->frames[PED_HEAD]->frame, &mat);
 		vec = mat.pos;
 	}
 	return dist + this->matrix.matrix.pos.z < vec.z;
@@ -170,10 +192,10 @@ CPed::DoesLOSBulletHitPed(CColPoint *colpoint)
 	RwV3d pos = { 0.0f, 0.0f, 0.0f };
 	if(IsClumpSkinned(this->clump)){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(this->clump);
-		RwInt32 idx = RpHAnimIDGetIndex(hier, this->frames[2]->nodeID);
+		RwInt32 idx = RpHAnimIDGetIndex(hier, this->frames[PED_HEAD]->nodeID);
 		RwV3dTransformPoints(&pos, &pos, 1, &RpHAnimHierarchyGetMatrixArray(hier)[idx]);
 	}else{
-		CPedIK::GetWorldMatrix(this->frames[2]->frame, &mat);
+		CPedIK::GetWorldMatrix(this->frames[PED_HEAD]->frame, &mat);
 		pos = mat.pos;
 	}
 	if(this->dwAction == 36 || pos.z > colpoint->point.z)
@@ -201,9 +223,9 @@ cped_prerender_hook1(void)
 		mov	ecx, [esp+0xC]
 		call	CEntity::UpdateRpHAnim
 
-	x:
 		mov	ecx, [esp+0xC]
 		call    PedEx::SizeHead
+	x:
 
 		mov	eax, [esp+0xC]
 		push	dword ptr 0x4CFE1E
@@ -250,24 +272,24 @@ CalculateNewVelocity(void)
 		/*
 		orient->theta = RAD2DEG(orient->phi);
 		RwV3d axis = { -1.0f, 0.0f, 0.0f };
-		RtQuatRotate(&ped->frames[7]->hanimframe->q, &axis, orient->theta, rwCOMBINEPRECONCAT);
-		RtQuatRotate(&ped->frames[8]->hanimframe->q, &axis, orient->theta, rwCOMBINEPRECONCAT);
+		RtQuatRotate(&ped->frames[PED_Supperlegl]->hanimframe->q, &axis, orient->theta, rwCOMBINEPRECONCAT);
+		RtQuatRotate(&ped->frames[PED_Supperlegr]->hanimframe->q, &axis, orient->theta, rwCOMBINEPRECONCAT);
 		ped->bfFlagsI |= 0x20;
 		*/
 
 		orient->theta = RAD2DEG(orient->phi);
 		RwV3d axis1 = { 1.0f, 0.0f, 0.0f };
 		RwV3d axis2 = { 0.0f, 0.0f, 1.0f };
-		RtQuatRotate(&ped->frames[7]->hanimframe->q, &axis2, RAD2DEG(0.1f), rwCOMBINEPOSTCONCAT);
-		RtQuatRotate(&ped->frames[7]->hanimframe->q, &axis1, orient->theta, rwCOMBINEPOSTCONCAT);
-		RtQuatRotate(&ped->frames[8]->hanimframe->q, &axis2, RAD2DEG(0.1f), rwCOMBINEPOSTCONCAT);
-		RtQuatRotate(&ped->frames[8]->hanimframe->q, &axis1, orient->theta, rwCOMBINEPOSTCONCAT);
+		RtQuatRotate(&ped->frames[PED_UPPERLEGL]->hanimframe->q, &axis2, RAD2DEG(0.1f), rwCOMBINEPOSTCONCAT);
+		RtQuatRotate(&ped->frames[PED_UPPERLEGL]->hanimframe->q, &axis1, orient->theta, rwCOMBINEPOSTCONCAT);
+		RtQuatRotate(&ped->frames[PED_UPPERLEGR]->hanimframe->q, &axis2, RAD2DEG(0.1f), rwCOMBINEPOSTCONCAT);
+		RtQuatRotate(&ped->frames[PED_UPPERLEGR]->hanimframe->q, &axis1, orient->theta, rwCOMBINEPOSTCONCAT);
 		ped->bfFlagsI |= 0x20;
 
 	}else{
 		orient->theta = 0.0f;
-		ped->pedIK.RotateTorso(ped->frames[7], orient, 0);
-		ped->pedIK.RotateTorso(ped->frames[8], orient, 0);
+		ped->pedIK.RotateTorso(ped->frames[PED_UPPERLEGL], orient, 0);
+		ped->pedIK.RotateTorso(ped->frames[PED_UPPERLEGR], orient, 0);
 	}
 }
 
@@ -277,7 +299,11 @@ CalculateNewVelocity_hook(void)
 	_asm{
 		mov	[frameptr], esp
 		mov	[thisptr], ebx
+		sub	esp,108
+		fsave	[esp]
 		call	CalculateNewVelocity
+		frstor	[esp]
+		add	esp,108
 		push	dword ptr 0x4C78C7
 		retn
 	}
@@ -291,10 +317,10 @@ PlayFootSteps1(void)
 	vec->x = vec->y = vec->z = 0.0f;
 	if(IsClumpSkinned(ped->clump)){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(ped->clump);
-		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[9]->nodeID);
+		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[PED_FOOTL]->nodeID);
 		RwV3dTransformPoints(vec, vec, 1, &RpHAnimHierarchyGetMatrixArray(hier)[idx]);
 	}else{
-		for(RwFrame *f = ped->frames[9]->frame; f; f = (RwFrame *)f->object.parent )
+		for(RwFrame *f = ped->frames[PED_FOOTL]->frame; f; f = (RwFrame *)f->object.parent )
 			RwV3dTransformPoints(vec, vec, 1, &f->modelling);
 	}
 }
@@ -307,10 +333,10 @@ PlayFootSteps2(void)
 	vec->x = vec->y = vec->z = 0.0f;
 	if(IsClumpSkinned(ped->clump)){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(ped->clump);
-		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[10]->nodeID);
+		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[PED_FOOTR]->nodeID);
 		RwV3dTransformPoints(vec, vec, 1, &RpHAnimHierarchyGetMatrixArray(hier)[idx]);
 	}else{
-		for(RwFrame *f = ped->frames[10]->frame; f; f = (RwFrame *)f->object.parent )
+		for(RwFrame *f = ped->frames[PED_FOOTR]->frame; f; f = (RwFrame *)f->object.parent )
 			RwV3dTransformPoints(vec, vec, 1, &f->modelling);
 	}
 }
@@ -321,7 +347,11 @@ PlayFootSteps_hook1(void)
 	_asm{
 		mov	[frameptr], esp
 		mov	[thisptr], ebx
+		sub	esp,108
+		fsave	[esp]
 		call	PlayFootSteps1
+		frstor	[esp]
+		add	esp,108
 		push	dword ptr 0x4CC855
 		retn
 	}
@@ -333,7 +363,11 @@ PlayFootSteps_hook2(void)
 	_asm{
 		mov	[frameptr], esp
 		mov	[thisptr], ebx
+		sub	esp,108
+		fsave	[esp]
 		call	PlayFootSteps2
+		frstor	[esp]
+		add	esp,108
 		push	dword ptr 0x4CCA3F
 		retn
 	}
@@ -350,10 +384,10 @@ Attack1(void)
 	*vec = *wvec;
 	if(IsClumpSkinned(ped->clump)){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(ped->clump);
-		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[6]->nodeID);
+		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[PED_HANDR]->nodeID);
 		RwV3dTransformPoints(vec, vec, 1, &RpHAnimHierarchyGetMatrixArray(hier)[idx]);
 	}else{
-		for(RwFrame *f = ped->frames[6]->frame; f; f = (RwFrame *)f->object.parent )
+		for(RwFrame *f = ped->frames[PED_HANDR]->frame; f; f = (RwFrame *)f->object.parent )
 			RwV3dTransformPoints(vec, vec, 1, &f->modelling);
 	}
 }
@@ -383,7 +417,11 @@ Attack_hook1(void)
 	_asm{
 		mov	[frameptr], esp
 		mov	[thisptr], ebx
+		sub	esp,108
+		fsave	[esp]
 		call	Attack1
+		frstor	[esp]
+		add	esp,108
 		push	dword ptr 0x4E70F1
 		retn
 	}
@@ -396,7 +434,11 @@ Attack_hook2(void)
 		mov	[frameptr], esp
 		mov	[otherptr], ebp
 		mov	[thisptr], ebx
+		sub	esp,108
+		fsave	[esp]
 		call	Attack2
+		frstor	[esp]
+		add	esp,108
 		push	dword ptr 0x4E6EA0
 		retn
 	}
@@ -411,10 +453,10 @@ FireInstantHit(void)
 
 	if(IsClumpSkinned(ped->clump)){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(ped->clump);
-		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[6]->nodeID);
+		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[PED_HANDR]->nodeID);
 		RwV3dTransformPoints(vec, vec, 1, &RpHAnimHierarchyGetMatrixArray(hier)[idx]);
 	}else{
-		for(RwFrame *f = ped->frames[6]->frame; f; f = (RwFrame *)f->object.parent )
+		for(RwFrame *f = ped->frames[PED_HANDR]->frame; f; f = (RwFrame *)f->object.parent )
 			RwV3dTransformPoints(vec, vec, 1, &f->modelling);
 	}
 }
@@ -424,7 +466,11 @@ FireInstantHit_hook(void)
 {
 	_asm{
 		mov	[frameptr], esp
+		sub	esp,108
+		fsave	[esp]
 		call	FireInstantHit
+		frstor	[esp]
+		add	esp,108
 		push	dword ptr 0x55D838
 		retn
 	}
@@ -438,10 +484,10 @@ FinishLaunchCB1(void)
 	RwV3d *vec = (RwV3d*)(frameptr-0x40);
 	if(IsClumpSkinned(ped->clump)){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(ped->clump);
-		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[9]->nodeID);
+		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[PED_FOOTL]->nodeID);
 		RwV3dTransformPoints(vec, vec, 1, &RpHAnimHierarchyGetMatrixArray(hier)[idx]);
 	}else{
-		for(RwFrame *f = ped->frames[9]->frame; f; f = (RwFrame *)f->object.parent )
+		for(RwFrame *f = ped->frames[PED_FOOTL]->frame; f; f = (RwFrame *)f->object.parent )
 			RwV3dTransformPoints(vec, vec, 1, &f->modelling);
 	}
 }
@@ -454,10 +500,10 @@ FinishLaunchCB2(void)
 	RwV3d *vec = (RwV3d*)(frameptr-0x40);
 	if(IsClumpSkinned(ped->clump)){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(ped->clump);
-		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[10]->nodeID);
+		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[PED_FOOTR]->nodeID);
 		RwV3dTransformPoints(vec, vec, 1, &RpHAnimHierarchyGetMatrixArray(hier)[idx]);
 	}else{
-		for(RwFrame *f = ped->frames[10]->frame; f; f = (RwFrame *)f->object.parent )
+		for(RwFrame *f = ped->frames[PED_FOOTR]->frame; f; f = (RwFrame *)f->object.parent )
 			RwV3dTransformPoints(vec, vec, 1, &f->modelling);
 	}
 }
@@ -468,7 +514,11 @@ FinishLaunchCB_hook1(void)
 	_asm{
 		mov	[frameptr], esp
 		mov	[otherptr], ebp
+		sub	esp,108
+		fsave	[esp]
 		call	FinishLaunchCB1
+		frstor	[esp]
+		add	esp,108
 		push	dword ptr 0x4D7837
 		retn
 	}
@@ -480,7 +530,11 @@ FinishLaunchCB_hook2(void)
 	_asm{
 		mov	[frameptr], esp
 		mov	[otherptr], ebp
+		sub	esp,108
+		fsave	[esp]
 		call	FinishLaunchCB2
+		frstor	[esp]
+		add	esp,108
 		push	dword ptr 0x4D798F
 		retn
 	}
@@ -526,7 +580,11 @@ Fight_hook(void)
 	_asm{
 		mov	[frameptr], esp
 		mov	[otherptr], ebp
+		sub	esp,108
+		fsave	[esp]
 		call	Fight
+		frstor	[esp]
+		add	esp,108
 		push	dword ptr 0x4E80B5
 		retn
 	}
@@ -536,14 +594,14 @@ void
 CopAI(void)
 {
 	frameptr += 0x90;
-	CPed *ped = (CPed*)otherptr;
+	CPed *ped = (CPed*)thisptr;
 	RwV3d *vec = (RwV3d*)(frameptr-0x60);
 	if(IsClumpSkinned(ped->clump)){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(ped->clump);
-		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[6]->nodeID);
+		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[PED_HANDR]->nodeID);
 		RwV3dTransformPoints(vec, vec, 1, &RpHAnimHierarchyGetMatrixArray(hier)[idx]);
 	}else{
-		for(RwFrame *f = ped->frames[6]->frame; f; f = (RwFrame *)f->object.parent )
+		for(RwFrame *f = ped->frames[PED_HANDR]->frame; f; f = (RwFrame *)f->object.parent )
 			RwV3dTransformPoints(vec, vec, 1, &f->modelling);
 	}
 }
@@ -554,7 +612,11 @@ CopAI_hook(void)
 	_asm{
 		mov	[frameptr], esp
 		mov	[thisptr], ebx
+		sub	esp,108
+		fsave	[esp]
 		call	CopAI
+		frstor	[esp]
+		add	esp,108
 		push	dword ptr 0x4C201F
 		retn
 	}
@@ -576,9 +638,8 @@ StartFightDefend(void)
 		RwV3d pos;
 		pos.x = pos.y = pos.z = 0.0f;
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(ped->clump);
-		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[2]->nodeID);
+		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[PED_HEAD]->nodeID);
 		RwV3dTransformPoints(&pos, &pos, 1, &RpHAnimHierarchyGetMatrixArray(hier)[idx]);
-		CPedIK::GetWorldMatrix(ped->frames[2]->frame, &mat);
 		for(int i = 0; i < 4; i++){
 			v1.x = pos.x - 0.2f * ped->matrix.matrix.up.x;
 			v1.y = pos.y - 0.2f * ped->matrix.matrix.up.y;
@@ -586,7 +647,7 @@ StartFightDefend(void)
 			CParticle__AddParticle(4, &v1, &v2, 0, 0.0f, 0, 0, 0, 0);
 		}
 	}else{
-		CPedIK::GetWorldMatrix(ped->frames[2]->frame, &mat);
+		CPedIK::GetWorldMatrix(ped->frames[PED_HEAD]->frame, &mat);
 		for(int i = 0; i < 4; i++){
 			v1.x = mat.pos.x - 0.2f * ped->matrix.matrix.up.x;
 			v1.y = mat.pos.y - 0.2f * ped->matrix.matrix.up.y;
@@ -601,62 +662,75 @@ StartFightDefend_hook(void)
 {
 	_asm{
 		mov	[otherptr], ebp
+		sub	esp,108
+		fsave	[esp]
 		call	StartFightDefend
+		frstor	[esp]
+		add	esp,108
 		push	dword ptr 0x4E78E4
 		retn
 	}
 }
 
-void __declspec(naked)
-ProcessLineOfSightSectorList_hook(void)
+
+
+CColModel &CTempColModels__ms_colModelPedGroundHit = *(CColModel*)0x880480;
+
+CColModel*
+CPed::GetColModel(void)
 {
-	_asm{
-		push	dword ptr [ebp+4Ch]	// clump
-		call	IsClumpSkinned
-		test	eax, eax
-		jz	noskin
-		// TODO test
-		movsx	eax, word ptr [ebp+5Ch]		// modelID
-		mov	ecx, 83D408h[eax*4]
-		call	CPedModelInfo::AnimatePedColModelSkinned
-		mov	edx, eax
-		push	dword ptr 4B0D77h
-		retn
-	noskin:
-		mov	dword ptr [esp], 4B0D40h
-		retn
-	}
+	if(IsClumpSkinned(clump))
+		return ((CPedModelInfo*)CModelInfo::ms_modelInfoPtrs[nModelIndex])->AnimatePedColModelSkinned(clump);
+	if(UseGroundColModel())
+		return &CTempColModels__ms_colModelPedGroundHit;
+	return ((CPedModelInfo*)CModelInfo::ms_modelInfoPtrs[nModelIndex])->colModel;
 }
 
 void __declspec(naked)
-FightStrike_hook(void)
+ProcessLineOfSightSectorList_hook2(void)
 {
 	_asm{
-		push	dword ptr [ebp+4Ch]	// clump
-		call	IsClumpSkinned
-		test	eax, eax
-		jz	noskin
-		// TODO test
-		movsx	eax, word ptr [ebp+5Ch]		// modelID
-		mov	ecx, 83D408h[eax*4]
-		call	CPedModelInfo::AnimatePedColModelSkinned
-		mov	esi, eax
-		push	dword ptr 4E9055h
-		retn
-	noskin:
-		movsx	ecx, word ptr [ebp+5Ch]
-		mov	eax, 83D408h[ecx*4]
-		mov	dword ptr [esp], 4E9017h
+		call	CPed::GetColModel
+		mov	edx,eax
+		push	0x4B0D77
 		retn
 	}
 }
 
 CColModel*
-GetPedColModel(CPed *ped)
+GetFightColModel(CPed *ped)
 {
 	if(IsClumpSkinned(ped->clump))
-		return ((CPedModelInfo *)CModelInfo::ms_modelInfoPtrs[ped->nModelIndex])->AnimatePedColModelSkinned(ped->clump);
-	else{
+		return ((CPedModelInfo*)CModelInfo::ms_modelInfoPtrs[ped->nModelIndex])->AnimatePedColModelSkinned(ped->clump);
+	if(ped->dwAction == 36 || ped->dwAction == 48 || ped->dwAction == 49 || !ped->IsPedHeadAbovePos(-0.3f))
+		return &CTempColModels__ms_colModelPedGroundHit;
+	return ((CPedModelInfo*)CModelInfo::ms_modelInfoPtrs[ped->nModelIndex])->colModel;
+}
+
+void __declspec(naked)
+FightStrike_hook2(void)
+{
+	_asm{
+		// have to clean up floating point shit first
+		fcompp
+		fstp	st
+
+		push	ebp
+		call	GetFightColModel
+		add	esp,4
+		mov	esi,eax
+		push	0x4E9055
+		retn
+	}
+}
+
+// For Burstable tyre mod
+CColModel*
+GetPedColModel(CPed *ped)
+{
+	if(IsClumpSkinned(ped->clump)){
+		return ((CPedModelInfo*)CModelInfo::ms_modelInfoPtrs[ped->nModelIndex])->AnimatePedColModelSkinned(ped->clump);
+	}else{
 		extern CColModel *( __cdecl *Original_GetPedColModel)(CPed *ped);
 		return Original_GetPedColModel(ped);
 	}
@@ -664,10 +738,13 @@ GetPedColModel(CPed *ped)
 
 void CSpecialFX__Update_Patch()
 {
-	int pedid = CPools__GetPedRef(FindPlayerPed()) >> 8;
-	RpAtomic *atomic = weaponAtomics[pedid];
+	if(IsClumpSkinned(FindPlayerPed()->clump)){
+		int pedid = CPools__GetPedRef(FindPlayerPed()) >> 8;
+		RpAtomic *atomic = weaponAtomics[pedid];
 
-	LookForBatCB((RwObject *)atomic, (void *)CModelInfo::ms_modelInfoPtrs[172]);
+		LookForBatCB((RwObject*)atomic, (void *)CModelInfo::ms_modelInfoPtrs[172]);
+	}else
+		RwFrameForAllObjects(FindPlayerPed()->frames[PED_HANDR]->frame, LookForBatCB, (void*)CModelInfo::ms_modelInfoPtrs[172]);
 }
 
 enum tParticleType
@@ -678,53 +755,50 @@ enum tParticleType
 
 WRAPPER void * __cdecl CParticle__AddParticle(tParticleType type, CVector const &vecPos, CVector const &vecDir, CEntity *pEntity, float fSize, int nRotationSpeed, int nRotation, int nCurFrame, int nLifeSpan) { EAXJMP(0x50D140); }
 
+bool &CGame__nastyGame = *(bool*)0x5F4DD4;
+WRAPPER RwFrame *RecurseFrameChildrenVisibilityCB(RwFrame *f, void *v) { EAXJMP(0x4EAE20); }
 
-void CPed::RemoveBodyPart(int nodeId, signed char a3)
+void
+CPed::RemoveBodyPart(int nodeId, bool unk)
 {
-	if ( frames[nodeId]->frame == NULL )
-	{
+	if(frames[nodeId]->frame == NULL){
 		printf("Trying to remove ped component");
 		return;
 	}
 
-	/*
-	if ( !CGame__nastyGame )
-		return;
-	*/
-	/*
-	if ( nodeId != PED_Shead )
-        CPed::SpawnFlyingComponent(this, nodeId, a3);
+	if(!IsClumpSkinned(clump)){
+		if(!CGame__nastyGame)
+			return;
 
-	RecurseFrameChildrenVisibilityCB(frames[nodeId]->frame, NULL);
-
-	*/
-
-	/*
-	for ( RwFrame *f = frames[nodeId]->frame; f; f = (RwFrame *)f->object.parent )
-		RwV3dTransformPoints(&point, &point, 1, &f->modelling);
-	*/
+		if(nodeId != PED_HEAD)
+			SpawnFlyingComponent(nodeId, unk);
+	
+		RecurseFrameChildrenVisibilityCB(frames[nodeId]->frame, NULL);
+	
+		RwV3d point = { 0.0f, 0.0f, 0.0f };
+		for(RwFrame *f = frames[nodeId]->frame; f; f = (RwFrame *)f->object.parent)
+			RwV3dTransformPoints(&point, &point, 1, &f->modelling);
+	}
 
 	CVector point(0.0f, 0.0f, 0.0f);
 	pedIK.GetComponentPosition((RwV3d *)&point, nodeId);
 
-	if ( GetIsOnScreen() )
-	{
+	if(GetIsOnScreen()){
 		CParticle__AddParticle(PARTICLE_TEST, point, CVector(0.0f, 0.0f, 0.0f), 0, 0.1f, 0, 0, 0, 0);
 
-		for ( int i = 0; i < 16; i++ )
-			CParticle__AddParticle(PARTICLE_BLOOD_SMALL, point, CVector(0.0f, 0.0f, 0.029999999f), 0, 0.0f, 0, 0, 0, 0);
+		for(int i = 0; i < 16; i++)
+			CParticle__AddParticle(PARTICLE_BLOOD_SMALL, point, CVector(0.0f, 0.0f, 0.03f), 0, 0.0f, 0, 0, 0, 0);
 	}
 
-	bfFlagsC = bfFlagsC & 0xDF | 0x20;
+	bfFlagsC = bfFlagsC & ~20 | 0x20;
 	byteBodyPartBleeding = nodeId;
 }
 
 void PedEx::SizeHead()
 {
-	if ( ((unsigned char)bfFlagsC >> 5) & 1 && byteBodyPartBleeding == PED_Shead )
-	{
+	if((bfFlagsC >> 5) & 1 && byteBodyPartBleeding == PED_HEAD){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(clump);
-		int bonetag = ConvertPedNode2BoneTag(PED_Shead);
+		int bonetag = ConvertPedNode2BoneTag(PED_HEAD);
 		RwUInt32 index = RpHAnimIDGetIndex(hier, bonetag);
 		RwMatrix *pMatrix = RpHAnimHierarchyGetMatrixArray(hier);
 		RwV3d scale = { 0.0f, 0.0f, 0.0f };
@@ -784,6 +858,16 @@ void PedEx::SizeHead()
 	*/
 }
 
+static void (__thiscall *playerpedcontrol)(CPlayerPed *ped);
+void CPlayerPed::ProcessControl_hook(void)
+{
+	playerpedcontrol(this);
+	if(IsClumpSkinned(this->clump))
+		// Update HAnim in first person mode
+		if((this->bfFlagsB & 4) == 0)
+			UpdateRpHAnim();
+}
+
 void
 pedhooks(void)
 {
@@ -809,6 +893,8 @@ pedhooks(void)
 	InjectHook(0x4E781A, StartFightDefend_hook, PATCH_JUMP);
 	InjectHook(0x4C1FF0, CopAI_hook, PATCH_JUMP);
 
+	InterceptVmethod(&playerpedcontrol, &CPlayerPed::ProcessControl_hook, 0x5FA520);
+
 	InjectHook(0x4EF7EA, &CPed::ctor);
 	InjectHook(0x4C2E4D, &CPed::ctor);
 	InjectHook(0x4C11BE, &CPed::ctor);
@@ -821,11 +907,8 @@ pedhooks(void)
 	// We *have* to animate the hit colmodel because
 	// the initial bone positions at creation are wrong!
 	// redirect two short jumps to alignment bytes and insert jump there
-	Patch<BYTE>(0x4B0D26, 0x13);
-	Patch<BYTE>(0x4B0D35, 0x4);
-	InjectHook(0x4B0D3A, ProcessLineOfSightSectorList_hook, PATCH_JUMP);
-	//
-	InjectHook(0x4E900C, FightStrike_hook, PATCH_JUMP);
+	InjectHook(0x4B0D42, ProcessLineOfSightSectorList_hook2, PATCH_JUMP);
+	InjectHook(0x4E900C, FightStrike_hook2, PATCH_JUMP);
 
 	InjectHook(0x4EAEE0, &CPed::RemoveBodyPart, PATCH_JUMP);
 

@@ -51,7 +51,7 @@ CPedIK::ExtractYawAndPitchLocalSkinned(AnimBlendFrameData *frameData, float *yaw
 void
 CPedIK::RotateHead(void)
 {
-	RtQuat *q = &this->ped->frames[2]->hanimframe->q;
+	RtQuat *q = &this->ped->frames[PED_HEAD]->hanimframe->q;
 	RtQuatRotate(q, &xAxis, RAD2DEG(this->headOrient.phi), rwCOMBINEREPLACE);
 	RtQuatRotate(q, &zAxis, RAD2DEG(this->headOrient.theta), rwCOMBINEPOSTCONCAT);
 	this->ped->bfFlagsI |= 0x20;
@@ -64,7 +64,7 @@ CPedIK::LookInDirection(float phi, float theta)
 	ret = 1;
 
 	RwMatrix mat;
-	AnimBlendFrameData *frameData = this->ped->frames[2];
+	AnimBlendFrameData *frameData = this->ped->frames[PED_HEAD];
 	float alpha, beta;
 	if(IsClumpSkinned(this->ped->clump)){
 		if((frameData->flag & 2) == 0){
@@ -89,7 +89,7 @@ CPedIK::LookInDirection(float phi, float theta)
 				ret = 1;
 		}
 		if((this->flags & 2) == 0)
-			this->RotateTorso(this->ped->frames[1], &this->torsoOrient, false);
+			this->RotateTorso(this->ped->frames[PED_TORSO], &this->torsoOrient, false);
 		this->RotateHead();
 	}else{
 		RwFrame *f = frameData->frame;
@@ -121,7 +121,7 @@ CPedIK::LookInDirection(float phi, float theta)
 		cmat.matrix.pos.z += pos.z;
 		cmat.UpdateRW();
 		if((this->flags & 2) == 0)
-			this->RotateTorso(this->ped->frames[1], &this->torsoOrient, false);
+			this->RotateTorso(this->ped->frames[PED_TORSO], &this->torsoOrient, false);
 		cmat.dtor();
 	}
 	return ret;
@@ -131,7 +131,7 @@ bool
 CPedIK::RestoreLookAt(void)
 {
 	bool ret = false;
-	AnimBlendFrameData *frm = this->ped->frames[2];
+	AnimBlendFrameData *frm = this->ped->frames[PED_HEAD];
 	RwMatrix *mat = &frm->frame->modelling;
 
 	float yaw, pitch;
@@ -166,34 +166,72 @@ CPedIK::RestoreLookAt(void)
 	if((this->flags & 2) == 0)
 		CPedIK::MoveLimb(&this->torsoOrient, 0.0f, 0.0f, CPedIK::ms_torsoInfo);
 	if((this->flags & 2) == 0)
-		this->RotateTorso(this->ped->frames[1], &this->torsoOrient, false);
+		this->RotateTorso(this->ped->frames[PED_TORSO], &this->torsoOrient, false);
 	return ret;
 }
 
 void
 CPedIK::RotateTorso(AnimBlendFrameData *animBlend, LimbOrientation *limb, bool flag)
 {
-	// TODO: this seems to be too simplistic
 	if(IsClumpSkinned(this->ped->clump)){
 		RtQuat *q = &animBlend->hanimframe->q;
-		RtQuatRotate(q, &xAxis, RAD2DEG(limb->phi), rwCOMBINEPRECONCAT);
-		RtQuatRotate(q, &zAxis, RAD2DEG(limb->theta), rwCOMBINEPRECONCAT);
+		// this is what the game does (also VC), but it does not look great
+		//RtQuatRotate(q, &xAxis, RAD2DEG(limb->phi), rwCOMBINEPRECONCAT);
+		//RtQuatRotate(q, &zAxis, RAD2DEG(limb->theta), rwCOMBINEPRECONCAT);	// pitch
+
+		// copied the code from the non-skinned case
+		// this seems to work ok
+		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(ped->clump);
+		// We can't get the parent matrix but right now we have Smid hardcoded as torso
+		// whose parent is Swaist
+		//int idx = RpHAnimIDGetIndex(hier, BONE_Swaist);
+		// or rather Storso and Smid
+		int idx = RpHAnimIDGetIndex(hier, BONE_Smid);
+
+		// Maybe this matrix isn't what we want?
+		RwMatrix *mat = &RpHAnimHierarchyGetMatrixArray(hier)[idx];
+		RwV3d vec1, vec2, vec3;
+		vec1.x = mat->right.z;
+		vec1.y = mat->up.z;
+		vec1.z = mat->at.z;
+		float c = cos(ped->fRotationCur);
+		float s = sin(ped->fRotationCur);
+		vec2.x = -(c*mat->right.x + s*mat->right.y);
+		vec2.y = -(c*mat->up.x + s*mat->up.y);
+		vec2.z = -(c*mat->at.x + s*mat->at.y);
+
+		// Not sure what exactly to do here
+
+	//	RtQuatRotate(q, &vec1, RAD2DEG(limb->phi), rwCOMBINEREPLACE);	// this is what VC does
+	//	RtQuatRotate(q, &vec2, RAD2DEG(limb->theta), rwCOMBINEPRECONCAT);
+
+		RtQuatRotate(q, &vec1, RAD2DEG(limb->phi), rwCOMBINEPRECONCAT);
+		RtQuatRotate(q, &vec2, RAD2DEG(limb->theta), rwCOMBINEPRECONCAT);
+
+	//	RtQuatRotate(q, &vec2, RAD2DEG(limb->theta), rwCOMBINEPOSTCONCAT);
+	//	RtQuatRotate(q, &vec1, RAD2DEG(limb->phi), rwCOMBINEPOSTCONCAT);
+
 		this->ped->bfFlagsI |= 0x20;
 		return;
 	}
 
+
+
 	RwFrame *f = animBlend->frame;
 	RwMatrix *mat = CPedIK::GetWorldMatrix((RwFrame*)f->object.parent, RwMatrixCreate());
 	RwV3d vec1, vec2, vec3;
+	// up vector
 	vec1.x = mat->right.z;
 	vec1.y = mat->up.z;
 	vec1.z = mat->at.z;
 	RwV3d pos = f->modelling.pos;
+	// rotation == 0 -> looking in y direction
+	// left? vector
 	float c = cos(ped->fRotationCur);
 	float s = sin(ped->fRotationCur);
-	vec2.x = -(c * mat->right.x) - s * mat->right.y;
-	vec2.y = -(c * mat->up.x) - s * mat->up.y;
-	vec2.z = -(c * mat->at.x) - s * mat->at.y;
+	vec2.x = -(c*mat->right.x + s*mat->right.y);
+	vec2.y = -(c*mat->up.x + s*mat->up.y);
+	vec2.z = -(c*mat->at.x + s*mat->at.y);
 
 	if(flag){
 		CVector v1, v2, v3;
@@ -222,7 +260,9 @@ CPedIK::RotateTorso(AnimBlendFrameData *animBlend, LimbOrientation *limb, bool f
 		RwMatrixRotate(&f->modelling, &vec1, RAD2DEG(limb->phi - (a - ped->fRotationCur)), rwCOMBINEPOSTCONCAT);
 		RwMatrixRotate(&f->modelling, &vec3, RAD2DEG(alpha), rwCOMBINEPOSTCONCAT);
 	}else{
+		// pitch
 		RwMatrixRotate(&f->modelling, &vec2, RAD2DEG(limb->theta), rwCOMBINEPOSTCONCAT);
+		// yaw
 		RwMatrixRotate(&f->modelling, &vec1, RAD2DEG(limb->phi), rwCOMBINEPOSTCONCAT);
 	}
 	f->modelling.pos = pos;
@@ -239,12 +279,13 @@ CPedIK::PointGunInDirectionUsingArm(float phi, float theta)
 	if(IsClumpSkinned(this->ped->clump)){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(this->ped->clump);
 		mat = RwMatrixCreate();
-		RwInt32 idx = RpHAnimIDGetIndex(hier, this->ped->frames[2]->nodeID);
+		// PED_Shead? really?
+		RwInt32 idx = RpHAnimIDGetIndex(hier, this->ped->frames[PED_HEAD]->nodeID);
 		*mat = RpHAnimHierarchyGetMatrixArray(hier)[idx];
 		CPedIK::ExtractYawAndPitchWorld(mat, &alpha, &beta);
 		RwMatrixDestroy(mat);
 	}else{
-		RwFrame *f = this->ped->frames[4]->frame;
+		RwFrame *f = this->ped->frames[PED_UPPERARMR]->frame;
 		mat = CPedIK::GetWorldMatrix((RwFrame*)f->object.parent, RwMatrixCreate());
 		CPedIK::ExtractYawAndPitchWorld(mat, &alpha, &beta);
 		RwMatrixDestroy(mat);
@@ -268,12 +309,12 @@ CPedIK::PointGunInDirectionUsingArm(float phi, float theta)
 		// only on PC and PS2...wtf?
 	}
 	if(IsClumpSkinned(this->ped->clump)){
-		RtQuat *q = &this->ped->frames[4]->hanimframe->q;
+		RtQuat *q = &this->ped->frames[PED_UPPERARMR]->hanimframe->q;
 		RtQuatRotate(q, &xAxis, RAD2DEG(this->upperArmOrient.phi), rwCOMBINEPOSTCONCAT);
 		RtQuatRotate(q, &zAxis, RAD2DEG(this->upperArmOrient.theta), rwCOMBINEPOSTCONCAT);
 		this->ped->bfFlagsI |= 0x20;
 	}else{
-		RwFrame *f = this->ped->frames[4]->frame;
+		RwFrame *f = this->ped->frames[PED_UPPERARMR]->frame;
 		pos = f->modelling.pos;
 
 		mat = CPedIK::GetWorldMatrix((RwFrame*)f->object.parent, RwMatrixCreate());
@@ -317,7 +358,7 @@ CPedIK::PointGunInDirection(float phi, float theta)
 	}else{
 /*		// WTF does that even do?
 		float alpha, beta;
-		RwMatrix *mat = CPedIK::GetWorldMatrix((RwFrame*)this->ped->frames[4]->frame->object.parent,
+		RwMatrix *mat = CPedIK::GetWorldMatrix((RwFrame*)this->ped->frames[PED_Supperarmr]->frame->object.parent,
 		                                       RwMatrixCreate());
 		CPedIK::ExtractYawAndPitchWorld(mat, &alpha, &beta);
 		RwMatrixDestroy(mat);
@@ -330,7 +371,7 @@ CPedIK::PointGunInDirection(float phi, float theta)
 			ret = 0;
 	}
 	flag = this->flags & 4 && ((CCam*)(TheCamera + 420 * camIdx + 420))->Using3rdPersonMouseCam();
-	this->RotateTorso(this->ped->frames[1], &this->torsoOrient, flag);
+	this->RotateTorso(this->ped->frames[PED_TORSO], &this->torsoOrient, flag);
 	return ret;
 }
 

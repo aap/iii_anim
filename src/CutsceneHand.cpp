@@ -151,7 +151,9 @@ WRAPPER int CFileMgr__LoadFile(const char *path, char *buf, int size, const char
 
 void CCutsceneHand::Init()
 {
+	const char *curfilename = "";
 	printf("CCutsceneHand::Init\n");
+
 	InitXML();
 	if(!useCutsceneHands)
 		return;
@@ -163,14 +165,16 @@ void CCutsceneHand::Init()
 		for(int r = 0; r < MAX_RACES; r++){
 			for(int h = 0; h < MAX_HANDS; h++){
 				SetupTxd();
-				RwStream *stream = RwStreamOpen(rwSTREAMFILENAME, rwSTREAMREAD, handDefs[g][r][h].fileName);
-				RwStreamFindChunk(stream, rwID_CLUMP, NULL, NULL);
+				curfilename = handDefs[g][r][h].fileName;
+				RwStream *stream = RwStreamOpen(rwSTREAMFILENAME, rwSTREAMREAD, curfilename);
+				if(stream == NULL) goto cantopen;
+				if(!RwStreamFindChunk(stream, rwID_CLUMP, NULL, NULL)) goto noclump;
 				handDefs[g][r][h].clump = RpClumpStreamRead(stream);
 				RwStreamClose(stream, NULL);
 				errors |= handDefs[g][r][h].clump == NULL;
 				assert(handDefs[g][r][h].clump);
 
-				printf("RpClumpStreamRead: 0x%X, %s\n", handDefs[g][r][h].clump, handDefs[g][r][h].fileName);
+				printf("RpClumpStreamRead: 0x%X, %s\n", handDefs[g][r][h].clump, curfilename);
 			}
 		}
 	}
@@ -178,27 +182,31 @@ void CCutsceneHand::Init()
 	for(int p = 0; p < MAX_PROPS; p++){
 		for(int h = 0; h < MAX_HANDS; h++){
 			SetupTxd();
-			RwStream *stream = RwStreamOpen(rwSTREAMFILENAME, rwSTREAMREAD, stickDefs[p][h].fileName);
-			RwStreamFindChunk(stream, rwID_CLUMP, NULL, NULL);
+			curfilename = stickDefs[p][h].fileName;
+			RwStream *stream = RwStreamOpen(rwSTREAMFILENAME, rwSTREAMREAD, curfilename);
+			if(stream == NULL) goto cantopen;
+			if(!RwStreamFindChunk(stream, rwID_CLUMP, NULL, NULL)) goto noclump;
 			stickDefs[p][h].clump = RpClumpStreamRead(stream);
 			RwStreamClose(stream, NULL);
 			errors |= stickDefs[p][h].clump == NULL;
 			assert(stickDefs[p][h].clump);
 
-			printf("RpClumpStreamRead: 0x%X, %s\n", stickDefs[p][h].clump, stickDefs[p][h].fileName);
+			printf("RpClumpStreamRead: 0x%X, %s\n", stickDefs[p][h].clump, curfilename);
 		}
 	}
 
 	for(int g = 0; g < MAX_GENDERS; g++){
 		for(int h = 0; h < MAX_HANDS; h++){
-			RwStream *stream = RwStreamOpen(rwSTREAMFILENAME, rwSTREAMREAD, handAnimDefs[g][h].animFile);
-			RwStreamFindChunk(stream, rwID_HANIMANIMATION, NULL, NULL);
+			curfilename = handAnimDefs[g][h].animFile;
+			RwStream *stream = RwStreamOpen(rwSTREAMFILENAME, rwSTREAMREAD, curfilename);
+			if(stream == NULL) goto cantopen;
+			if(!RwStreamFindChunk(stream, rwID_HANIMANIMATION, NULL, NULL)) goto noanim;
 			handAnimDefs[g][h].anim = RpHAnimAnimationStreamRead(stream);
 			RwStreamClose(stream, NULL);
 			errors |= handAnimDefs[g][h].anim == NULL;
 			assert(handAnimDefs[g][h].anim);
 
-			printf("RpHAnimAnimationStreamRead: 0x%X, 0x%X %d %f %s\n", handAnimDefs[g][h].anim, handAnimDefs[g][h].anim->pFrames, handAnimDefs[g][h].anim->numFrames, handAnimDefs[g][h].anim->duration, handAnimDefs[g][h].animFile);
+			printf("RpHAnimAnimationStreamRead: 0x%X, 0x%X %d %f %s\n", handAnimDefs[g][h].anim, handAnimDefs[g][h].anim->pFrames, handAnimDefs[g][h].anim->numFrames, handAnimDefs[g][h].anim->duration, curfilename);
 		}
 	}
 
@@ -206,6 +214,20 @@ void CCutsceneHand::Init()
 		MessageBox(NULL, "Could not load Cutscene hands, please put all needed files into the anim directory", "Error", MB_ICONERROR | MB_OK);
 		exit(1);
 	}
+	return;
+	static char errstr[256];
+cantopen:
+	snprintf(errstr, 256, "Could not open file %s, please put all needed files into the anim directory", curfilename);
+	MessageBox(NULL, errstr, "Error", MB_ICONERROR | MB_OK);
+	exit(1);
+noclump:
+	snprintf(errstr, 256, "Could not find clump in file %s, please put all needed files into the anim directory", curfilename);
+	MessageBox(NULL, errstr, "Error", MB_ICONERROR | MB_OK);
+	exit(1);
+noanim:
+	snprintf(errstr, 256, "Could not find animation in file %s, please put all needed files into the anim directory", curfilename);
+	MessageBox(NULL, errstr, "Error", MB_ICONERROR | MB_OK);
+	exit(1);
 }
 
 void CCutsceneHand::SetupTxd()
@@ -335,6 +357,26 @@ void CCutsceneHand::InitialiseCharacters()
 			Instances[p][h].Initialise();
 }
 
+RwObject*
+hideAtomicCB(RwObject *object, void *data)
+{
+	if(RwObjectGetType(object) == rpATOMIC){
+		RpAtomic *atomic = (RpAtomic*)object;
+		RpAtomicSetFlags(atomic, RpAtomicGetFlags(atomic) & ~rpATOMICRENDER);
+	}
+	return object;
+}
+
+RwObject*
+showAtomicCB(RwObject *object, void *data)
+{
+	if(RwObjectGetType(object) == rpATOMIC){
+		RpAtomic *atomic = (RpAtomic*)object;
+		RpAtomicSetFlags(atomic, RpAtomicGetFlags(atomic) | rpATOMICRENDER);
+	}
+	return object;
+}
+
 CCutsceneHand *CCutsceneHand::hand_ctor(CObject *object, Handedness hand)
 {
 	ctor(); // CCutsceneObject
@@ -349,8 +391,6 @@ CCutsceneHand *CCutsceneHand::hand_ctor(CObject *object, Handedness hand)
 
 	char *name = ((CBaseModelInfo *)CModelInfo::ms_modelInfoPtrs[object->nModelIndex])->name;
 
-	// bug ?
-	//strncpy(Instances[ext->m_nPedIndex][ext->m_Hand].m_aName, name, 15);	// let's only do it once...
 	strncpy(Instances[ext->m_nPedIndex][ext->m_Hand].m_aName, name, 15);
 
 	ext->m_bIsSkinned = IsClumpSkinned(object->clump) != NULL;
@@ -359,10 +399,14 @@ CCutsceneHand *CCutsceneHand::hand_ctor(CObject *object, Handedness hand)
 
 		ext->m_pHandFrame = frameData->frame;
 
+		// hide regular hands
+		// TODO: this may not be what we want. but this whole code is a mess.
+		RwFrameForAllObjects(ext->m_pHandFrame, hideAtomicCB, NULL);
+
 		AtomicByNameData atomicData;
 
 		atomicData.atomic = NULL;
-		atomicData.name[0] = '0'; // null terminated string ? lol
+		atomicData.name[0] = '\0';
 
 		Race race = Instances[ext->m_nPedIndex][ext->m_Hand].m_Race;
 		Prop prop = Instances[ext->m_nPedIndex][ext->m_Hand].m_Prop;
@@ -489,6 +533,7 @@ void CCutsceneHand::ProcessControl()
 
 	if(Instances[ext->m_nPedIndex][ext->m_Hand].m_pAtomic){
 		RpHAnimHierarchy *hier = RpSkinAtomicGetHAnimHierarchy(Instances[ext->m_nPedIndex][ext->m_Hand].m_pAtomic);
+		assert(hier);
 		RpHAnimHierarchySetCurrentAnimTime(hier, Instances[ext->m_nPedIndex][ext->m_Hand].m_fAnimTime);
 		RpHAnimHierarchyUpdateMatrices(hier);
 	}
@@ -511,14 +556,18 @@ void CCutsceneHand::Render()
 		RpMaterialSetColor(RpGeometryGetMaterial(RpAtomicGetGeometry(Instances[ext->m_nPedIndex][ext->m_Hand].m_pAtomic), 0), (RwRGBA *)&Instances[ext->m_nPedIndex][ext->m_Hand].m_Color);
 
 	RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(ext->m_pObject->clump);
-	RpHAnimHierarchyUpdateMatrices(hier);
-	int idx = RpHAnimIDGetIndex(hier, ext->m_Hand == HANDEDNESS_RIGHT ? BONE_SRhand : BONE_SLhand);
-	RwMatrix *ltm = RpHAnimHierarchyGetMatrixArray(hier);
+	if(hier)
+		RpHAnimHierarchyUpdateMatrices(hier);
+	// not needed...
+	//int idx = RpHAnimIDGetIndex(hier, ext->m_Hand == HANDEDNESS_RIGHT ? BONE_SRhand : BONE_SLhand);
+	//RwMatrix *ltm = RpHAnimHierarchyGetMatrixArray(hier);
 
 	UpdateSkin();
 	UpdateRwFrame();
 
-	RpHAnimHierarchyUpdateMatrices(RpSkinAtomicGetHAnimHierarchy(GetFirstAtomic(clump)));
+	hier = RpSkinAtomicGetHAnimHierarchy(GetFirstAtomic(clump));
+	assert(hier);
+	RpHAnimHierarchyUpdateMatrices(hier);
 
 	((CObject*)this)->Render();
 }
@@ -526,12 +575,22 @@ void CCutsceneHand::Render()
 RwMatrix *CCutsceneHand::GetBoneMatrix(RpClump *clump, int bone)
 {
 	RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(clump);
-	int idx = RpHAnimIDGetIndex(hier, bone);
-
-	if(idx < 0)
+	if(hier){
+		int idx = RpHAnimIDGetIndex(hier, bone);
+	
+		if(idx < 0)
+			return NULL;
+		else
+			return &RpHAnimHierarchyGetMatrixArray(hier)[idx];
+	}else{
+		RwObjectAssociation assoc;
+		assoc.name = (char*)ConvertBoneTag2BoneName(bone);
+		assoc.out = NULL;
+		CClumpModelInfo::FindFrameFromNameCB(RpClumpGetFrame(clump), &assoc);
+		if(assoc.out)
+			return RwFrameGetLTM(assoc.out);
 		return NULL;
-	else
-		return &RpHAnimHierarchyGetMatrixArray(hier)[idx];
+	}
 }
 
 void CCutsceneHand::CopyBoneMatrix(RpClump *clump, int bone, RwMatrix *out)
@@ -763,7 +822,7 @@ bool CCutsceneHand::IsCutsceneRunning(const std::string &name)
 	return false;
 }
 
-
+/*
 static void __declspec(naked) LoadCutsceneData_hook()
 {
 	__asm
@@ -774,6 +833,21 @@ static void __declspec(naked) LoadCutsceneData_hook()
 	}
 
 	EAXJMP(0x479100);
+}
+*/
+
+__declspec(naked) char * cutscene_strcpy(char * d, const char * s)
+{
+	EAXJMP(0x5A0920);
+}
+
+static char * LoadCutsceneData_hook(char * d, const char * s)
+{
+	char *r = cutscene_strcpy(d, s);
+	
+	CCutsceneHand::Init();
+	
+	return r;
 }
 
 static void __declspec(naked) DeleteCutsceneData_hook()
@@ -885,7 +959,8 @@ static void __declspec(naked) hideObjsCutscene_Hook()
 
 void handhooks(void)
 {
-	InjectHook(0x4046BF, LoadCutsceneData_hook, PATCH_CALL);
+	//InjectHook(0x4046BF, LoadCutsceneData_hook, PATCH_CALL); //fucked up with modloader
+	InjectHook(0x4046AE, LoadCutsceneData_hook, PATCH_CALL);
 	InjectHook(0x4049A5, DeleteCutsceneData_hook, PATCH_CALL);
 	InjectHook(0x447505, AddCutsceneHead_hook, PATCH_CALL);
 

@@ -18,7 +18,7 @@ GetFirstObject(RwFrame *frame)
 
 WRAPPER int CPools__GetObjectRef(CObject *object) { EAXJMP(0x4A1B00); }
 
-CCutsceneObject::ObjectExt CCutsceneObject::objectExt[450];
+CCutsceneObject::ObjectExt CCutsceneObject::objectExt[MAXOBJECTS];
 
 //
 // CCutsceneObject
@@ -179,6 +179,7 @@ CCutsceneHead::Render(void)
 	ObjectExt *ext = this->getExt();
 	if(ext->isSkinned){
 		hier = GetAnimHierarchyFromSkinClump(ext->object->clump);
+		assert(hier);
 		RpHAnimHierarchyUpdateMatrices(hier);
 		int idx = RpHAnimIDGetIndex(hier, BONE_Shead);
 		RwMatrix *ltm = &RpHAnimHierarchyGetMatrixArray(hier)[idx];
@@ -201,6 +202,7 @@ CCutsceneHead::Render(void)
 	this->UpdateRwFrame();
 	RpAtomic *atm = GetFirstAtomic(this->clump);
 	hier = RpSkinAtomicGetHAnimHierarchy(atm);
+	assert(hier);
 	RpHAnimHierarchyUpdateMatrices(hier);
 	((CObject*)this)->Render();
 }

@@ -2,6 +2,9 @@
 #define _CRT_SECURE_NO_WARNINGS
 #define _USE_MATH_DEFINES
 
+#pragma warning(disable: 4996)  // POSIX name
+
+
 #include <windows.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -20,6 +23,14 @@ typedef uintptr_t addr;
 
 #include "MemoryMgr.h"
 
+#define ADAPTHIERARCHY
+
+#define MAXOBJECTS 450
+#define MAXPEDMODELS 90
+#define MAXPEDS 140
+
+
+
 #define RAD2DEG(x) (180.0f*(x)/M_PI)
 
 void pedhooks(void);
@@ -29,6 +40,8 @@ void handhooks(void);
 
 #define RwEngineInstance (*rwengine)
 extern void **rwengine;
+
+extern int &CTimer__m_FrameCounter;
 
 void *RwMallocAlign(uint size, int alignment);
 void RwFreeAlign(void*);
@@ -44,6 +57,7 @@ RpAtomic *GetFirstAtomic(RpClump *clump);
 RpAtomic *IsClumpSkinned(RpClump*);
 RpHAnimHierarchy* GetAnimHierarchyFromSkinClump(RpClump *clump);
 RpHAnimHierarchy* GetAnimHierarchyFromClump(RpClump *clump);
+const char *ConvertBoneTag2BoneName(int tag);
 int ConvertPedNode2BoneTag(int node);
 
 void DeleteRwObject_hook(RpClump *clump);
@@ -228,7 +242,7 @@ struct CEntity : CPlaceable
 	char bfFlagsE;
 	char __f0052[2];
 	short unk1;
-	short uiPathMedianRand;
+	short RandomSeed;
 	short nModelIndex;
 	short level;
 	int pFirstRef;
@@ -473,11 +487,20 @@ struct CPed : public CPhysical
 	void RemoveWeaponModel(int i);
 	bool IsPedHeadAbovePos(float dist);
 	char DoesLOSBulletHitPed(CColPoint *colpoint);
-	void RemoveBodyPart(int nodeId, signed char unk);
+	void RemoveBodyPart(int nodeId, bool unk);
+	void SpawnFlyingComponent(int nodeId, bool unk);
+	bool UseGroundColModel(void);
+
+	CColModel *GetColModel(void);
 
 	CPed *ctor_orig(uint type);
 };
 static_assert(sizeof(CPed) == 0x540, "CPed: wrong size");
+
+struct CPlayerPed : public CPed
+{
+	void ProcessControl_hook(void);
+};
 
 struct CObject : public CPhysical
 {
@@ -544,7 +567,7 @@ struct CCutsceneObject : public CObject
 	void Render(void);
 	void PreRender();
 
-	static ObjectExt objectExt[450];
+	static ObjectExt objectExt[MAXOBJECTS];
 	ObjectExt *getExt(void){ return &objectExt[CPools__GetObjectRef(this) >> 8]; }
 	void SetRenderHead(bool r) { getExt()->renderHead = r; }
 	bool GetRenderHead(void) { return getExt()->renderHead; }
@@ -731,15 +754,33 @@ struct CBaseModelInfo
 };
 static_assert(sizeof(CBaseModelInfo) == 0x30, "CBaseModelInfo: wrong size");
 
+struct RwObjectNameIdAssocation
+{
+	char *name;
+	int id;
+	int flags;
+};
+
+struct RwObjectAssociation
+{
+	union {
+		char *name;
+		int id;
+	};
+	RwFrame *out;
+};
+
 struct CClumpModelInfo : public CBaseModelInfo
 {
 	RpClump *clump;
 
 	RpClump *CreateInstance(void);
 	void SetClump(RpClump*);
-	void SetFrameIds(int ids);
+	void SetFrameIds(RwObjectNameIdAssocation *ids);
 
 	static RpAtomic *SetAtomicRendererCB(RpAtomic*, void*);
+	static RwFrame *FindFrameFromNameCB(RwFrame *frame, void *data);
+	static RwFrame *FindFrameFromIdCB(RwFrame *frame, void *data);
 };
 static_assert(sizeof(CClumpModelInfo) == 0x34, "CBaseModelInfo: wrong size");
 
@@ -753,17 +794,20 @@ struct CPedModelInfo : public CClumpModelInfo
 	RpAtomic *head;
 	RpAtomic *lhand;
 	RpAtomic *rhand;
+
 	CPedModelInfo(void);
 	void SetClump(RpClump *clump);
 	void DeleteRwObject(void);
 	CColModel *AnimatePedColModelSkinned(RpClump *clump);
 	void CreateHitColModel(void);
 	void CreateHitColModelSkinned(RpClump *clump);
+
+	static RwObjectNameIdAssocation m_pPedIds[12];
 };
 
 struct CStore_PedModelInfo {
 	int numElements;
-	CPedModelInfo objects[90];
+	CPedModelInfo objects[MAXPEDMODELS];
 };
 
 struct CModelInfo
@@ -799,6 +843,12 @@ CAnimBlendAssociation *RpAnimBlendClumpGetFirstAssociation(RpClump *clump, uint 
 CAnimBlendAssociation *RpAnimBlendGetNextAssociation(CAnimBlendAssociation *assoc);
 CAnimBlendAssociation *RpAnimBlendGetNextAssociation(CAnimBlendAssociation *assoc, uint mask);
 
+void CVisibilityPlugins__SetClumpModelInfo(RpClump *clump, int clumpModelInfo);
+RpAtomic *CVisibilityPlugins__RenderPlayerCB(RpAtomic*);
+void CVisibilityPlugins__RenderAlphaAtomic(RpAtomic*,int);
+int CVisibilityPlugins__GetClumpAlpha(RpClump* clump);
+//void CVisibilityPlugins__SetClumpAlpha(RpClump* clump, int alpha);
+
 //extern RpAtomic *atomicArray[20];
 //extern int atomicArraySP;
 //void atomicsToArray(RpClump *clump);
@@ -823,19 +873,23 @@ enum BoneTag {
 };
 
 enum PedNode {
-	PED_Swaist,
-	PED_Storso,
-	PED_Shead,
-	PED_Supperarml,
-	PED_Supperarmr,
-	PED_SLhand,
-	PED_SRhand,
-	PED_Supperlegl,
-	PED_Supperlegr,
-	PED_Sfootl,
-	PED_Sfootr,
-	PED_Slowerlegr,
-	PED_Slowerlegl
+	PED_WAIST,
+	PED_TORSO,	// Smid on PS2/PC, Storso on mobile/xbox. We follow mobile/xbox (makes kicking on ground look better)
+	PED_HEAD,
+	PED_UPPERARML,
+	PED_UPPERARMR,
+	PED_HANDL,
+	PED_HANDR,
+	PED_UPPERLEGL,
+	PED_UPPERLEGR,
+	PED_FOOTL,
+	PED_FOOTR,
+	PED_LOWERLEGR,
+	// This is not valid apparently
+	PED_LOWERLEGL,
+	// actual fixed nodes needed for hit col model
+	PED_ACTUAL_TORSO,
+	PED_ACTUAL_MID,
 };
 
 struct RFrame {
@@ -980,6 +1034,7 @@ public:
 
 	CAnimBlendAssociation(void);
 	CAnimBlendAssociation(CAnimBlendAssociation&);
+	CAnimBlendAssociation::CAnimBlendAssociation(CAnimBlendAssociation &a, RpClump *clump);
 	~CAnimBlendAssociation(void);
 	void ctor(void);
 	void dtor(void);
@@ -997,6 +1052,8 @@ public:
 	void SetFinishCallback(void (*callback)(CAnimBlendAssociation*, void*), void *arg);
 	void UpdateTime(float f1, float f2);
 	bool UpdateBlend(float f);
+
+	void CopyForClump(CAnimBlendAssociation &anim, RpClump *clump);
 };
 
 // complete
@@ -1016,6 +1073,11 @@ public:
 	CAnimBlendAssociation *GetAnimation(const char *name);
 	CAnimBlendAssociation *CopyAnimation(uint i);
 	CAnimBlendAssociation *CopyAnimation(const char *name);
+	CAnimBlendAssociation *CopyAnimation(uint i, RpClump *clump);
+	CAnimBlendAssociation *CopyAnimation(const char *name, RpClump *clump);
+	// need non-overloaded function for inline assembly
+	CAnimBlendAssociation *CopyAnimationNoClump(const char *name) { return CopyAnimation(name); }
+	CAnimBlendAssociation *CopyAnimationForClump(const char *name, RpClump *clump) { return CopyAnimation(name, clump); }
 };
 
 struct AnimBlendFrameData
@@ -1072,6 +1134,7 @@ public:
 	static CAnimBlendHierarchy *GetAnimation(const char *name, CAnimBlock *animBlock);
 	static const char *GetAnimGroupName(int i);
 	static CAnimBlendAssociation *CreateAnimAssociation(int groupId, int animId);
+	static CAnimBlendAssociation *CreateAnimAssociation(int groupId, int animId, RpClump *clump);
 	static CAnimBlendAssociation *GetAnimAssociation(int groupId, int animId);
 	static CAnimBlendAssociation *GetAnimAssociation(int groupId, const char *name);
 	static CAnimBlendAssociation *AddAnimation(RpClump *clump, int groupId, int animId);

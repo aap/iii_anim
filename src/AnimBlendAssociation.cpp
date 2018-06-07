@@ -18,6 +18,22 @@ CAnimBlendAssociation::CAnimBlendAssociation(CAnimBlendAssociation &a)
 	this->prev = NULL;
 	this->Init(a);
 }
+#ifdef ADAPTHIERARCHY
+CAnimBlendAssociation::CAnimBlendAssociation(CAnimBlendAssociation &a, RpClump *clump)
+{
+	this->vtable = &CAnimBlendAssociation_VTable;
+	this->nodes = NULL;
+	this->blendAmount = 1.0f;
+	this->blendDelta = 0.0f;
+	this->currentTime = 0.0f;
+	this->speed = 1.0f;
+	this->timeStep = 0.0f;
+	this->callbackType = 0;
+	this->next = NULL;
+	this->prev = NULL;
+	this->CopyForClump(a, clump);
+}
+#endif
 CAnimBlendAssociation::~CAnimBlendAssociation(void) { dtor(); }
 
 void
@@ -85,6 +101,36 @@ CAnimBlendAssociation::Init(CAnimBlendAssociation &anim)
 		this->nodes[i].blendAssoc = this;
 	}
 }
+
+#ifdef ADAPTHIERARCHY
+// Copy the BlendAssoc in such a way that it can work with a different frame hierarchy
+void
+CAnimBlendAssociation::CopyForClump(CAnimBlendAssociation &anim, RpClump *clump)
+{
+	CAnimBlendClumpData *clumpData = *RWPLUGINOFFSET(CAnimBlendClumpData*, clump, ClumpOffset);
+
+	this->hierarchy = anim.hierarchy;
+	this->numNodes = clumpData->numFrames;
+	this->flags = anim.flags;
+	this->animId = anim.animId;
+	this->nodes = (CAnimBlendNode*)RwMallocAlign((sizeof(CAnimBlendNode)*this->numNodes + 0x3F)&~0x3F, 64);
+	for(int i = 0; i < this->numNodes; i++){
+		this->nodes[i].Init();
+		this->nodes[i].blendAssoc = this;
+	}
+
+	CAnimBlendHierarchy *hier = anim.hierarchy;
+	AnimBlendFrameData *frameData;
+	for(int i = 0; i < anim.hierarchy->numSequences; i++){
+		CAnimBlendSequence *seq = &anim.hierarchy->blendSequences[i];
+		frameData = RpAnimBlendClumpFindFrame(clump, seq->name);
+		if(frameData && seq->numFrames > 0){
+			int n = frameData - clumpData->frames;
+			this->nodes[n].sequence = seq;
+		}
+	}
+}
+#endif
 
 void
 CAnimBlendAssociation::AllocateAnimBlendNodeArray(int n)
