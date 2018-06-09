@@ -728,12 +728,7 @@ FightStrike_hook2(void)
 CColModel*
 GetPedColModel(CPed *ped)
 {
-	if(IsClumpSkinned(ped->clump)){
-		return ((CPedModelInfo*)CModelInfo::ms_modelInfoPtrs[ped->nModelIndex])->AnimatePedColModelSkinned(ped->clump);
-	}else{
-		extern CColModel *( __cdecl *Original_GetPedColModel)(CPed *ped);
-		return Original_GetPedColModel(ped);
-	}
+	return ped->GetColModel();
 }
 
 void CSpecialFX__Update_Patch()
