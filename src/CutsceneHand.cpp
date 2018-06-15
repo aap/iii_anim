@@ -377,6 +377,15 @@ showAtomicCB(RwObject *object, void *data)
 	return object;
 }
 
+void
+SetAtomicVisibility(RwFrame *frame, bool visible)
+{
+	if(visible)
+		RwFrameForAllObjects(frame, showAtomicCB, NULL);
+	else
+		RwFrameForAllObjects(frame, hideAtomicCB, NULL);
+}
+
 CCutsceneHand *CCutsceneHand::hand_ctor(CObject *object, Handedness hand)
 {
 	ctor(); // CCutsceneObject
@@ -401,7 +410,7 @@ CCutsceneHand *CCutsceneHand::hand_ctor(CObject *object, Handedness hand)
 
 		// hide regular hands
 		// TODO: this may not be what we want. but this whole code is a mess.
-		RwFrameForAllObjects(ext->m_pHandFrame, hideAtomicCB, NULL);
+		SetAtomicVisibility(ext->m_pHandFrame, false);
 
 		AtomicByNameData atomicData;
 
@@ -500,6 +509,8 @@ void CCutsceneHand::ProcessControl()
 {
 	ObjectExt *ext = getExt();
 	if(!ext->m_bIsSkinned){
+		ConfigureForCharacter(ext->m_nPedIndex);
+
 		RwMatrixSetIdentity(&matrix.matrix);
 
 		CMatrix mat1, mat2;
@@ -771,11 +782,20 @@ void CCutsceneHand::SetModel(HandState &hs)
 			SetSkinnedModel(ext->m_nPedIndex, (Handedness)ext->m_Hand, hs.m_Gender, hs.m_Race, hs.m_Stature, hs.m_Prop);
 		}
 	}else{
+		Instances[ext->m_nPedIndex][ext->m_Hand].m_bHasHands = !hs.m_Model.empty();
+
 		if(ext->m_pObject){
 			if(ext->m_Hand == HANDEDNESS_LEFT)
 				ext->m_pObject->SetRenderLeftHand(Instances[ext->m_nPedIndex][ext->m_Hand].m_bHasHands == false);
 			else if(ext->m_Hand == HANDEDNESS_RIGHT)
 				ext->m_pObject->SetRenderRightHand(Instances[ext->m_nPedIndex][ext->m_Hand].m_bHasHands == false);
+
+			SetAtomicVisibility(ext->m_pHandFrame, Instances[ext->m_nPedIndex][ext->m_Hand].m_bHasHands == false);
+		}
+
+		if(Instances[ext->m_nPedIndex][ext->m_Hand].m_bHasHands){
+			hs.m_Prop = (Prop)!stricmp(hs.m_Model.c_str(), XMLConfigure::HAND_MODEL_STICK);
+			SetSkinnedModel(ext->m_nPedIndex, (Handedness)ext->m_Hand, hs.m_Gender, hs.m_Race, hs.m_Stature, hs.m_Prop);
 		}
 	}
 }

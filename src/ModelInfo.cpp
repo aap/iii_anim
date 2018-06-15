@@ -338,6 +338,97 @@ CPedModelInfo::AnimatePedColModelSkinned(RpClump *clump)
 	return colmodel;
 }
 
+CColModel*
+CPedModelInfo::AnimatePedColModel(CColModel *colmodel, RwFrame *frame)
+{
+	RwObjectAssociation search;
+	RwMatrix *mat = RwMatrixCreate();
+	CColSphere *spheres = colmodel->spheres;
+	
+	for(int i = 0; i < NUMPEDINFONODES; i++){
+		search.name = m_pColNodeInfos[i].name;
+		search.out = NULL;
+		RwFrameForAllChildren(frame, FindFrameFromNameCB, &search);
+		
+		RwFrame *f = search.out;
+		if(f){
+			RwMatrixCopy(mat, RwFrameGetMatrix(f));
+			
+			for(f = RwFrameGetParent(f); f; f = RwFrameGetParent(f)){
+				RwMatrixTransform(mat, &f->modelling, rwCOMBINEPOSTCONCAT);
+				if(RwFrameGetParent(f) == frame)
+					break;
+			}
+			
+			spheres[i].center.x = mat->pos.x + m_pColNodeInfos[i].x;
+			spheres[i].center.y = mat->pos.y + 0.0f;
+			spheres[i].center.z = mat->pos.z + m_pColNodeInfos[i].z;
+		}
+	}
+	
+	return colmodel;
+}
+
+CColModel*
+CPedModelInfo::AnimatePedColModelWorld(CColModel *colmodel, RwFrame *frame)
+{
+	RwObjectAssociation search;
+	RwMatrix *mat = RwMatrixCreate();
+	CColSphere *spheres = colmodel->spheres;
+	
+	for(int i = 0; i < NUMPEDINFONODES; i++){
+		if(m_pColNodeInfos[i].name){
+			search.name = m_pColNodeInfos[i].name;
+			search.out = NULL;
+			RwFrameForAllChildren(frame, FindFrameFromNameCB, &search);
+		}else{
+			search.id = m_pColNodeInfos[i].pednode;
+			search.out = NULL;
+			RwFrameForAllChildren(frame, FindFrameFromIdCB, &search);
+		}
+		
+		RwFrame *f = search.out;
+		if(f){
+			RwMatrixCopy(mat, RwFrameGetMatrix(f));
+			
+			RwV3d point = {0.0f, 0.0f, 0.0f};
+			RwV3dTransformPoints(&point, &point, 1, mat);
+			
+			spheres[i].center.x = point.x + m_pColNodeInfos[i].x;
+			spheres[i].center.y = point.y + 0.0f;
+			spheres[i].center.z = point.z + m_pColNodeInfos[i].z;
+		}
+	}
+	
+	return colmodel;
+}
+
+CColModel*
+CPedModelInfo::AnimatePedColModelSkinnedWorld(RpClump *clump)
+{
+	CColModel *colmodel = this->hitColModel;
+	if(colmodel == NULL)
+		this->CreateHitColModelSkinned(clump);
+	
+	CColSphere *spheres = colmodel->spheres;
+	RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(clump);
+	
+	for(int i = 0; i < NUMPEDINFONODES; i++)
+	{	
+		RwV3d point = {0.0f, 0.0f, 0.0f};
+		int id = ConvertPedNode2BoneTag(m_pColNodeInfos[i].pednode);
+		int idx = RpHAnimIDGetIndex(hier, id);
+		
+		RwV3dTransformPoints(&point, &point, 1, &RpHAnimHierarchyGetMatrixArray(hier)[idx]);
+		
+		spheres[i].center.x = point.x + m_pColNodeInfos[i].x;
+		spheres[i].center.y = point.y + 0.0f;
+		spheres[i].center.z = point.z + m_pColNodeInfos[i].z;
+	}
+	
+	return colmodel;
+}
+
 void
 CPedModelInfo::CreateHitColModelSkinned(RpClump *clump)
 {

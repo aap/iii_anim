@@ -798,9 +798,13 @@ struct CPedModelInfo : public CClumpModelInfo
 	CPedModelInfo(void);
 	void SetClump(RpClump *clump);
 	void DeleteRwObject(void);
-	CColModel *AnimatePedColModelSkinned(RpClump *clump);
 	void CreateHitColModel(void);
 	void CreateHitColModelSkinned(RpClump *clump);
+
+	CColModel *AnimatePedColModelSkinned(RpClump *clump);
+	CColModel *AnimatePedColModelSkinnedWorld(RpClump *clump);
+	CColModel *AnimatePedColModel(CColModel *colmodel, RwFrame *frame);
+	CColModel *AnimatePedColModelWorld(CColModel *colmodel, RwFrame *frame);
 
 	static RwObjectNameIdAssocation m_pPedIds[12];
 };

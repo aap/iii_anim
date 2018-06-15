@@ -17,16 +17,16 @@ WRAPPER CPed *CPed::ctor_orig(uint type) { EAXJMP(0x4C41C0); }
 WRAPPER void CPed::SpawnFlyingComponent(int nodeId, bool unk) { EAXJMP(0x4EB060); }
 WRAPPER bool CPed::UseGroundColModel(void) { EAXJMP(0x4CE730); }
 
+// This causes models to be hit from too far a distance
+//#define FIREHEADFIXES
+
 
 RpAtomic *weaponAtomics[MAXPEDS];
 
-extern "C"
+extern "C" __declspec(dllexport) RpAtomic *IIIAnimGetPedWeaponAtomic(CPed *ped)
 {
-	__declspec(dllexport) RpAtomic *IIIAnimGetPedWeaponAtomic(CPed *ped)
-	{
-		int pedid = CPools__GetPedRef(ped) >> 8;
-		return weaponAtomics[pedid];
-	}
+	int pedid = CPools__GetPedRef(ped) >> 8;
+	return weaponAtomics[pedid];
 }
 
 
@@ -255,7 +255,9 @@ cped_prerender_hook2(void)
 	_asm{
 		mov	[esp+0x30], 0
 		mov	[frameptr], esp
+		pushad
 		call	PreRender2
+		popad
 		push	dword ptr 0x4CFED2
 		retn
 	}
@@ -299,11 +301,13 @@ CalculateNewVelocity_hook(void)
 	_asm{
 		mov	[frameptr], esp
 		mov	[thisptr], ebx
+		pushad
 		sub	esp,108
 		fsave	[esp]
 		call	CalculateNewVelocity
 		frstor	[esp]
 		add	esp,108
+		popad
 		push	dword ptr 0x4C78C7
 		retn
 	}
@@ -347,11 +351,13 @@ PlayFootSteps_hook1(void)
 	_asm{
 		mov	[frameptr], esp
 		mov	[thisptr], ebx
+		pushad
 		sub	esp,108
 		fsave	[esp]
 		call	PlayFootSteps1
 		frstor	[esp]
 		add	esp,108
+		popad
 		push	dword ptr 0x4CC855
 		retn
 	}
@@ -363,11 +369,13 @@ PlayFootSteps_hook2(void)
 	_asm{
 		mov	[frameptr], esp
 		mov	[thisptr], ebx
+		pushad
 		sub	esp,108
 		fsave	[esp]
 		call	PlayFootSteps2
 		frstor	[esp]
 		add	esp,108
+		popad
 		push	dword ptr 0x4CCA3F
 		retn
 	}
@@ -400,7 +408,7 @@ Attack2(void)
 	CPed *ped = (CPed*)thisptr;
 	CAnimBlendAssociation *blendAssoc = (CAnimBlendAssociation*)otherptr;
 	RwV3d *vec = (RwV3d*)(frameptr-0x54);
-	int n = blendAssoc->animId == 46 ? 10 : 6;
+	int n = blendAssoc->animId == 46 ? PED_FOOTR : PED_HANDR;
 	if(IsClumpSkinned(ped->clump)){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(ped->clump);
 		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[n]->nodeID);
@@ -417,11 +425,13 @@ Attack_hook1(void)
 	_asm{
 		mov	[frameptr], esp
 		mov	[thisptr], ebx
+		pushad
 		sub	esp,108
 		fsave	[esp]
 		call	Attack1
 		frstor	[esp]
 		add	esp,108
+		popad
 		push	dword ptr 0x4E70F1
 		retn
 	}
@@ -434,11 +444,13 @@ Attack_hook2(void)
 		mov	[frameptr], esp
 		mov	[otherptr], ebp
 		mov	[thisptr], ebx
+		pushad
 		sub	esp,108
 		fsave	[esp]
 		call	Attack2
 		frstor	[esp]
 		add	esp,108
+		popad
 		push	dword ptr 0x4E6EA0
 		retn
 	}
@@ -466,11 +478,13 @@ FireInstantHit_hook(void)
 {
 	_asm{
 		mov	[frameptr], esp
+		pushad
 		sub	esp,108
 		fsave	[esp]
 		call	FireInstantHit
 		frstor	[esp]
 		add	esp,108
+		popad
 		push	dword ptr 0x55D838
 		retn
 	}
@@ -514,11 +528,13 @@ FinishLaunchCB_hook1(void)
 	_asm{
 		mov	[frameptr], esp
 		mov	[otherptr], ebp
+		pushad
 		sub	esp,108
 		fsave	[esp]
 		call	FinishLaunchCB1
 		frstor	[esp]
 		add	esp,108
+		popad
 		push	dword ptr 0x4D7837
 		retn
 	}
@@ -530,11 +546,13 @@ FinishLaunchCB_hook2(void)
 	_asm{
 		mov	[frameptr], esp
 		mov	[otherptr], ebp
+		pushad
 		sub	esp,108
 		fsave	[esp]
 		call	FinishLaunchCB2
 		frstor	[esp]
 		add	esp,108
+		popad
 		push	dword ptr 0x4D798F
 		retn
 	}
@@ -549,19 +567,19 @@ Fight(void)
 	int n = -1;
 	switch(ped->dwLastHitState){
 	case 1: case 7: case 11:
-		n = 6;
+		n = PED_HANDR;
 		break;
 	case 6:
-		n = 5;
+		n = PED_HANDL;
 		break;
 	case 8: case 9: case 10: case 12:
-		n = 10;
+		n = PED_FOOTR;
 		break;
 	case 5:
-		n = 2;
+		n = PED_HEAD;
 		break;
 	case 4:
-		n = 11;
+		n = PED_LOWERLEGR;
 		break;
 	}
 	if(IsClumpSkinned(ped->clump)){
@@ -580,11 +598,13 @@ Fight_hook(void)
 	_asm{
 		mov	[frameptr], esp
 		mov	[otherptr], ebp
+		pushad
 		sub	esp,108
 		fsave	[esp]
 		call	Fight
 		frstor	[esp]
 		add	esp,108
+		popad
 		push	dword ptr 0x4E80B5
 		retn
 	}
@@ -601,7 +621,7 @@ CopAI(void)
 		RwInt32 idx = RpHAnimIDGetIndex(hier, ped->frames[PED_HANDR]->nodeID);
 		RwV3dTransformPoints(vec, vec, 1, &RpHAnimHierarchyGetMatrixArray(hier)[idx]);
 	}else{
-		for(RwFrame *f = ped->frames[PED_HANDR]->frame; f; f = (RwFrame *)f->object.parent )
+		for(RwFrame *f = ped->frames[PED_HANDR]->frame; f; f = (RwFrame *)f->object.parent)
 			RwV3dTransformPoints(vec, vec, 1, &f->modelling);
 	}
 }
@@ -612,11 +632,13 @@ CopAI_hook(void)
 	_asm{
 		mov	[frameptr], esp
 		mov	[thisptr], ebx
+		pushad
 		sub	esp,108
 		fsave	[esp]
 		call	CopAI
 		frstor	[esp]
 		add	esp,108
+		popad
 		push	dword ptr 0x4C201F
 		retn
 	}
@@ -634,7 +656,6 @@ StartFightDefend(void)
 	v2.z = 0.1f;
 
 	if(IsClumpSkinned(ped->clump)){
-		// TODO test
 		RwV3d pos;
 		pos.x = pos.y = pos.z = 0.0f;
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(ped->clump);
@@ -662,11 +683,13 @@ StartFightDefend_hook(void)
 {
 	_asm{
 		mov	[otherptr], ebp
+		pushad
 		sub	esp,108
 		fsave	[esp]
 		call	StartFightDefend
 		frstor	[esp]
 		add	esp,108
+		popad
 		push	dword ptr 0x4E78E4
 		retn
 	}
@@ -683,7 +706,7 @@ CPed::GetColModel(void)
 		return ((CPedModelInfo*)CModelInfo::ms_modelInfoPtrs[nModelIndex])->AnimatePedColModelSkinned(clump);
 	if(UseGroundColModel())
 		return &CTempColModels__ms_colModelPedGroundHit;
-	return ((CPedModelInfo*)CModelInfo::ms_modelInfoPtrs[nModelIndex])->colModel;
+	return ((CPedModelInfo*)CModelInfo::ms_modelInfoPtrs[nModelIndex])->hitColModel;
 }
 
 void __declspec(naked)
@@ -697,6 +720,24 @@ ProcessLineOfSightSectorList_hook2(void)
 	}
 }
 
+bool bUseWorldCoordsForFightStrike;
+bool bUseWorldCoordsForFight;
+CColModel &CTempColModels__ms_colModelPed1 = *(CColModel*)0x726CB0;
+
+#ifdef FIREHEADFIXES
+CColModel*
+GetFightColModel(CPed *ped)
+{
+	if(IsClumpSkinned(ped->clump)){
+		bUseWorldCoordsForFightStrike = true;
+		return ((CPedModelInfo*)CModelInfo::ms_modelInfoPtrs[ped->nModelIndex])->AnimatePedColModelSkinnedWorld(ped->clump);
+	}
+	bUseWorldCoordsForFightStrike = false;
+	if(ped->dwAction == 36 || ped->dwAction == 48 || ped->dwAction == 49 || !ped->IsPedHeadAbovePos(-0.3f))
+		return &CTempColModels__ms_colModelPedGroundHit;
+	return ((CPedModelInfo*)CModelInfo::ms_modelInfoPtrs[ped->nModelIndex])->hitColModel;
+}
+#else
 CColModel*
 GetFightColModel(CPed *ped)
 {
@@ -704,7 +745,126 @@ GetFightColModel(CPed *ped)
 		return ((CPedModelInfo*)CModelInfo::ms_modelInfoPtrs[ped->nModelIndex])->AnimatePedColModelSkinned(ped->clump);
 	if(ped->dwAction == 36 || ped->dwAction == 48 || ped->dwAction == 49 || !ped->IsPedHeadAbovePos(-0.3f))
 		return &CTempColModels__ms_colModelPedGroundHit;
-	return ((CPedModelInfo*)CModelInfo::ms_modelInfoPtrs[ped->nModelIndex])->colModel;
+	return ((CPedModelInfo*)CModelInfo::ms_modelInfoPtrs[ped->nModelIndex])->hitColModel;
+}
+#endif
+
+CColModel*
+GetFightColModel2(CPed *ped)
+{
+	if(IsClumpSkinned(ped->clump)){
+		if(ped->dwAction == 36 || ped->dwAction == 48 && (ped->bfFlagsD & 0x10)){
+			bUseWorldCoordsForFight = true;
+			return ((CPedModelInfo*)CModelInfo::ms_modelInfoPtrs[ped->nModelIndex])->AnimatePedColModelSkinnedWorld(ped->clump);
+		}else if(ped->dwAction == 48 || ped->dwAction == 49){
+			bUseWorldCoordsForFight = false;
+			return &CTempColModels__ms_colModelPedGroundHit;
+		}else{
+			bUseWorldCoordsForFight = false;
+			return &CTempColModels__ms_colModelPed1;
+		}
+	}
+	bUseWorldCoordsForFight = false;
+	if(ped->dwAction == 36 || ped->dwAction == 48 || ped->dwAction == 49 || !ped->IsPedHeadAbovePos(-0.3f))
+		return &CTempColModels__ms_colModelPedGroundHit;
+	return ((CPedModelInfo*)CModelInfo::ms_modelInfoPtrs[ped->nModelIndex])->hitColModel;
+}
+
+void __declspec(naked)
+FireMeleeHook2(void)
+{
+	__asm{
+		cmp     bUseWorldCoordsForFight, 0
+		jz      fm2_nonskin
+		
+//fm2_skin:
+		mov     eax, dword ptr [esp+0A8h-0A8h]
+		mov     edi, dword ptr [esp+0A8h-0A0h]	//ped pos
+		mov     esi, dword ptr [eax+40h]
+		
+		lea     ecx, dword ptr [edx+esi]	//ecx - sphere
+		
+
+		fld     dword ptr [ecx+8]
+		fsub    st, st(5)                
+		fstp    st(2)
+		
+
+		fld     dword ptr [ecx+4]
+		fsub    dword ptr [esp+0A8h-74h]
+		fstp    st(3)
+		
+
+		fld     dword ptr [ecx]
+		fsub    dword ptr [esp+0A8h-70h]
+		fstp    st(4)
+
+
+		push	0x55CC11
+		retn
+
+fm2_nonskin:
+		mov     eax, dword ptr [esp+0A8h-0A8h]
+		mov     edi, dword ptr [esp+0A8h-0A0h]
+
+		push	0x55CBEB
+		retn		
+	}
+}
+
+void __declspec(naked)
+FireMeleeHook(void)
+{
+	__asm{
+		pushad
+		push	ebx
+		call	GetFightColModel2
+		add	    esp,4
+
+		mov     dword ptr [esp+32+0A8h-0A8h], eax //add 32 to avoid pushad stack offset
+		//mov     dword ptr [esp+0A8h-0A8h], eax
+		
+		popad
+		
+		push	0x55CB10
+		retn
+	}
+}
+
+void __declspec(naked)
+FightStrikeHook(void)
+{
+	__asm{
+		
+		cmp     bUseWorldCoordsForFightStrike, 0
+		jz      fs_nonskin
+		
+//fs_skin:
+		mov     ecx, dword ptr [esp+88h-7Ch]
+		mov     eax, dword ptr [esi+40h]
+
+		add     ecx, 34h
+		add     eax, edx
+		
+		fld     dword ptr [eax+8]
+		fstp    st(1)
+		
+		fld     dword ptr [eax+4]
+		fstp    st(2)
+		
+		fld     dword ptr [eax]
+		fstp    dword ptr [esp+88h-48h]
+		
+		push	0x4E9089
+		retn
+		
+fs_nonskin:
+		mov     ecx, dword ptr [esp+88h-7Ch]
+		mov     eax, dword ptr [esi+40h]
+		
+		push	0x4E906C
+		retn
+	}
 }
 
 void __declspec(naked)
@@ -715,10 +875,20 @@ FightStrike_hook2(void)
 		fcompp
 		fstp	st
 
+		pushad
+		sub	esp,108
+		fsave	[esp]
+
 		push	ebp
 		call	GetFightColModel
 		add	esp,4
-		mov	esi,eax
+		mov	otherptr, eax
+
+		frstor	[esp]
+		add	esp,108
+		popad
+
+		mov	esi, otherptr
 		push	0x4E9055
 		retn
 	}
@@ -761,22 +931,21 @@ CPed::RemoveBodyPart(int nodeId, bool unk)
 		return;
 	}
 
-	if(!IsClumpSkinned(clump)){
-		if(!CGame__nastyGame)
-			return;
+	if(!CGame__nastyGame)
+		return;
 
+	CVector point(0.0f, 0.0f, 0.0f);
+
+	if(!IsClumpSkinned(clump)){
 		if(nodeId != PED_HEAD)
 			SpawnFlyingComponent(nodeId, unk);
 	
 		RecurseFrameChildrenVisibilityCB(frames[nodeId]->frame, NULL);
 	
-		RwV3d point = { 0.0f, 0.0f, 0.0f };
 		for(RwFrame *f = frames[nodeId]->frame; f; f = (RwFrame *)f->object.parent)
-			RwV3dTransformPoints(&point, &point, 1, &f->modelling);
-	}
-
-	CVector point(0.0f, 0.0f, 0.0f);
-	pedIK.GetComponentPosition((RwV3d *)&point, nodeId);
+			RwV3dTransformPoints((RwV3d*)&point, (RwV3d*)&point, 1, &f->modelling);
+	}else
+		pedIK.GetComponentPosition((RwV3d*)&point, nodeId);
 
 	if(GetIsOnScreen()){
 		CParticle__AddParticle(PARTICLE_TEST, point, CVector(0.0f, 0.0f, 0.0f), 0, 0.1f, 0, 0, 0, 0);
@@ -904,6 +1073,15 @@ pedhooks(void)
 	// redirect two short jumps to alignment bytes and insert jump there
 	InjectHook(0x4B0D42, ProcessLineOfSightSectorList_hook2, PATCH_JUMP);
 	InjectHook(0x4E900C, FightStrike_hook2, PATCH_JUMP);
+
+#ifdef FIREHEADFIXES
+	//VC stuff
+	/*************************************************/
+	InjectHook(0x4E9065, FightStrikeHook, PATCH_JUMP);
+	InjectHook(0x55CADE, FireMeleeHook, PATCH_JUMP);
+	InjectHook(0x55CBE4, FireMeleeHook2, PATCH_JUMP);
+	/*************************************************/
+#endif
 
 	InjectHook(0x4EAEE0, &CPed::RemoveBodyPart, PATCH_JUMP);
 
