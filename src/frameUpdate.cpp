@@ -39,7 +39,11 @@ FrameUpdateCallBackWith3dVelocityExtraction(AnimBlendFrameData *frame, CAnimBlen
 	do{
 		if((*node)->sequence){
 			bool nodelooped = (*node)->Update(vec, q, 1.0f-totalBlendAmount);
-			rot.Add(q);
+//			rot.Add(q);
+			if(q.x*rot.x + q.y*rot.y + q.z*rot.z + q.w*rot.w < 0.0f)
+				rot.Sub(q);
+			else
+				rot.Add(q);
 			if((*node)->sequence->flag & 2){
 				pos.Add(vec);
 				if((*node)->blendAssoc->flags & 0x40){
@@ -122,7 +126,11 @@ FrameUpdateCallBackWithVelocityExtraction(AnimBlendFrameData *frame, CAnimBlendN
 	for(node = nodes+1; *node; node++){
 		if((*node)->sequence){
 			bool nodelooped = (*node)->Update(vec, q, 1.0f-totalBlendAmount);
-			rot.Add(q);
+//			rot.Add(q);
+			if(q.x*rot.x + q.y*rot.y + q.z*rot.z + q.w*rot.w < 0.0f)
+				rot.Sub(q);
+			else
+				rot.Add(q);
 			if((*node)->sequence->flag & 2){
 				pos.Add(vec);
 				if((*node)->blendAssoc->flags & 0x40){
@@ -206,7 +214,11 @@ FrameUpdateCallBack(AnimBlendFrameData *frame, void *arg)
 	for(node = nodes+1; *node; node++){
 		if((*node)->sequence){
 			(*node)->Update(vec, q, 1.0f-totalBlendAmount);
-			rot.Add(q);
+//			rot.Add(q);
+			if(q.x*rot.x + q.y*rot.y + q.z*rot.z + q.w*rot.w < 0.0f)
+				rot.Sub(q);
+			else
+				rot.Add(q);
 			if((*node)->sequence->flag & 2)
 				pos.Add(vec);
 		}

@@ -384,7 +384,7 @@ RpAnimBlendClumpGetMainAssociation(RpClump *clump, CAnimBlendAssociation **outAs
 	}
 	if(outAssoc)
 		*outAssoc = assoc2;
-	if(*outFloat)
+	if(outFloat)
 		*outFloat = acc1;
 	return retval;
 }
@@ -397,6 +397,8 @@ RpAnimBlendClumpGetMainPartialAssociation(RpClump *clump)
 	float maxBlend = 0.0f;
 	for(void *link = clumpData->nextAssoc; link; link = *(void**)link){
 		CAnimBlendAssociation *a = (CAnimBlendAssociation*)((void**)link - 1);
+		if((a->flags & CAnimBlendAssociation::Partial) == 0)
+			continue;
 		if(a->blendAmount > maxBlend){
 			maxBlend = a->blendAmount;
 			retval = a;

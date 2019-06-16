@@ -345,7 +345,7 @@ void CCutsceneHand::HandInstance::Initialise()
 
 	m_aName[0] = '\0';
 
-	m_Gender = HANDEDNESS_MALE;
+	m_Gender = GENDER_MALE;
 	m_Race = RACE_WHITE;
 	m_Prop = PROP_NONE;
 }

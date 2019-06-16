@@ -66,7 +66,7 @@ void HandState::Init()
 
 	m_Color.r = 255; m_Color.g = 255; m_Color.b = 255; m_Color.a = 255;
 
-	m_Gender = CCutsceneHand::HANDEDNESS_MALE;
+	m_Gender = CCutsceneHand::GENDER_MALE;
 	m_Race = CCutsceneHand::RACE_WHITE;
 
 	m_Stature = CCutsceneHand::STATURE_1;
@@ -345,12 +345,12 @@ void XMLConfigure::HandGender(const XmlLibrary::AttributeVector *attributes)
 
 		if ( it != attributes->end() )
 		{
-			CCutsceneHand::Gender gender = CCutsceneHand::HANDEDNESS_MALE;
+			CCutsceneHand::Gender gender = CCutsceneHand::GENDER_MALE;
 
 			if ( !stricmp((*it)->Value().c_str(), XML_ATTRIBUTE_MALE) )
-				gender = CCutsceneHand::HANDEDNESS_MALE;
+				gender = CCutsceneHand::GENDER_MALE;
 			else if ( !stricmp((*it)->Value().c_str(), XML_ATTRIBUTE_FEMALE) )
-				gender = CCutsceneHand::HANDEDNESS_FEMALE;
+				gender = CCutsceneHand::GENDER_FEMALE;
 
 			if ( m_HandSide == CCutsceneHand::HANDEDNESS_RIGHT )
 			{

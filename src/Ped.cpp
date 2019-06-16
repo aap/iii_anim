@@ -47,6 +47,7 @@ CPed::ctor(uint type)
 {
 	this->ctor_orig(type);
 	int pedid = CPools__GetPedRef(this) >> 8;
+	assert(pedid < MAXPEDS);
 	weaponAtomics[pedid] = NULL;
 	return this;
 }
@@ -118,12 +119,16 @@ cped__render__hook(CPed *ped)
 		ped->renderLimb(PED_HANDL);
 		ped->renderLimb(PED_HANDR);
 		int pedid = CPools__GetPedRef(ped) >> 8;
+		assert(pedid < MAXPEDS);
 		RpAtomic *atomic = weaponAtomics[pedid];
 		if(atomic){
 			RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(ped->clump);
+			assert(hier);
 			int idx = RpHAnimIDGetIndex(hier, ped->frames[PED_HANDR]->nodeID);
 			RwMatrix *mat = &RpHAnimHierarchyGetMatrixArray(hier)[idx];
+			assert(mat);
 			RwFrame *frame = RpAtomicGetFrame(atomic);
+			assert(frame);
 			memcpy(RwFrameGetMatrix(frame), mat, 64);
 			RwFrameUpdateObjects(frame);
 			atomic->renderCallBack(atomic);
@@ -140,6 +145,7 @@ CPed::AddWeaponModel(int id)
 	RpAtomic *atomic = ((RpAtomic* (__thiscall*)(void*)) pedInfo->vtable[3])(pedInfo);
 	if(IsClumpSkinned(this->clump)){
 		int pedid = CPools__GetPedRef(this) >> 8;
+		assert(pedid < MAXPEDS);
 		weaponAtomics[pedid] = atomic;
 		if(id == 183)	// finger
 			AttachRimPipeToRwObject((RwObject*)atomic);
@@ -157,11 +163,13 @@ CPed::RemoveWeaponModel(int id)
 	this->weaponModelId = -1;
 	if(IsClumpSkinned(this->clump)){
 		int pedid = CPools__GetPedRef(this) >> 8;
+		assert(pedid < MAXPEDS);
 		RpAtomic *atomic = weaponAtomics[pedid];
 		if(atomic){
 			RwFrame *frame = RpAtomicGetFrame(atomic);
 			RpAtomicDestroy(atomic);
 			RwFrameDestroy(frame);
+			assert(pedid < MAXPEDS);
 			weaponAtomics[pedid] = NULL;
 		}
 	}else{
@@ -905,6 +913,7 @@ void CSpecialFX__Update_Patch()
 {
 	if(IsClumpSkinned(FindPlayerPed()->clump)){
 		int pedid = CPools__GetPedRef(FindPlayerPed()) >> 8;
+		assert(pedid < MAXPEDS);
 		RpAtomic *atomic = weaponAtomics[pedid];
 
 		LookForBatCB((RwObject*)atomic, (void *)CModelInfo::ms_modelInfoPtrs[172]);
@@ -954,7 +963,7 @@ CPed::RemoveBodyPart(int nodeId, bool unk)
 			CParticle__AddParticle(PARTICLE_BLOOD_SMALL, point, CVector(0.0f, 0.0f, 0.03f), 0, 0.0f, 0, 0, 0, 0);
 	}
 
-	bfFlagsC = bfFlagsC & ~20 | 0x20;
+	bfFlagsC = bfFlagsC & ~0x20 | 0x20;
 	byteBodyPartBleeding = nodeId;
 }
 

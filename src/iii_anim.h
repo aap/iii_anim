@@ -638,9 +638,9 @@ public:
 
 	enum Gender
 	{
-		HANDEDNESS_MALE = 0,
-		HANDEDNESS_FEMALE,
-		HANDEDNESS_SHEMALE,
+		GENDER_MALE = 0,
+		GENDER_FEMALE,
+		GENDER_SHEMALE,
 	};
 
 	enum Race
